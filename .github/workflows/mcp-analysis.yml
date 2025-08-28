@@ -55,10 +55,7 @@ jobs:
           mv /tmp/changes_truncated.diff /tmp/changes.diff
         fi
         
-        # 將 diff 內容存為環境變數 (處理多行) - 修正語法
-        echo 'DIFF_CONTENT<<EOF' >> $GITHUB_ENV
-        cat /tmp/changes.diff >> $GITHUB_ENV
-        echo 'EOF' >> $GITHUB_ENV
+        # diff 內容已保存在 /tmp/changes.diff 中，無需環境變數
         
         # 獲取變更統計
         CHANGED_FILES=$(git diff --name-only ${BASE_SHA}...${HEAD_SHA} | wc -l)
@@ -71,7 +68,7 @@ jobs:
 
     - name: 🤖 AI Code Analysis
       id: ai-analysis
-      if: env.DIFF_CONTENT != ''
+      if: steps.git-diff.outputs.changed-files != '0'
       run: |
         # 安裝 jq 如果需要
         if ! command -v jq &> /dev/null; then
@@ -96,9 +93,8 @@ jobs:
         }
         EOF
         
-        # 使用 jq 安全地插入變數值
-        jq --arg diff "$DIFF_CONTENT" \
-           --arg repo "${{ github.repository }}" \
+        # 使用 jq 安全地插入變數值 - 從文件讀取 diff 避免命令行長度限制
+        cat /tmp/changes.diff | jq -Rs --arg repo "${{ github.repository }}" \
            --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
            --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
            --arg pr_number "${{ steps.git-diff.outputs.pr-number }}" \
@@ -107,17 +103,20 @@ jobs:
            --argjson insertions "${{ steps.git-diff.outputs.insertions }}" \
            --argjson deletions "${{ steps.git-diff.outputs.deletions }}" \
            --arg event_type "${{ github.event_name }}" \
-           '.diff = $diff | 
-            .metadata.repository = $repo |
-            .metadata.branch = $branch |
-            .metadata.commit = $commit |
-            .metadata.pr_number = $pr_number |
-            .metadata.author = $author |
-            .metadata.changed_files = $changed_files |
-            .metadata.insertions = $insertions |
-            .metadata.deletions = $deletions |
-            .metadata.event_type = $event_type' \
-           /tmp/analysis_payload.json > /tmp/analysis_request.json
+           '{
+              "diff": .,
+              "metadata": {
+                "repository": $repo,
+                "branch": $branch,
+                "commit": $commit,
+                "pr_number": $pr_number,
+                "author": $author,
+                "changed_files": $changed_files,
+                "insertions": $insertions,
+                "deletions": $deletions,
+                "event_type": $event_type
+              }
+            }' > /tmp/analysis_request.json
         
         # 調用 MCP 分析 API
         ANALYSIS_RESULT=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/analyze" \
@@ -150,18 +149,20 @@ jobs:
         # 讀取分析結果
         ANALYSIS_JSON=$(cat /tmp/analysis_result.json 2>/dev/null || echo '{}')
         
-        # 使用 jq 安全地構建請求
-        jq --arg diff "$DIFF_CONTENT" \
-           --argjson analysis "$ANALYSIS_JSON" \
+        # 使用 jq 安全地構建請求 - 從文件讀取 diff
+        cat /tmp/changes.diff | jq -Rs --argjson analysis "$ANALYSIS_JSON" \
            --arg version "${{ github.ref_name }}-${{ github.run_number }}" \
            --arg repo "${{ github.repository }}" \
            --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
-           '.diff = $diff | 
-            .analysis_result = $analysis |
-            .version = $version |
-            .metadata.repository = $repo |
-            .metadata.commit = $commit' \
-           /tmp/doc_template.json > /tmp/doc_request.json
+           '{
+              "diff": .,
+              "analysis_result": $analysis,
+              "version": $version,
+              "metadata": {
+                "repository": $repo,
+                "commit": $commit
+              }
+            }' > /tmp/doc_request.json
         
         DOC_PATCH=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/generate-docs" \
           -H "Content-Type: application/json" \
