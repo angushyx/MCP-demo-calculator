@@ -178,6 +178,19 @@ body {
     background: linear-gradient(145deg, #6b46c1, #553c9a);
 }
 
+.btn-history {
+    background: linear-gradient(145deg, #17a2b8, #138496);
+    color: white;
+    font-size: 1.2em;
+    height: 45px;
+    box-shadow: 0 3px 8px rgba(23, 162, 184, 0.3);
+}
+
+.btn-history:hover {
+    background: linear-gradient(145deg, #138496, #0f5963);
+    transform: translateY(-2px) scale(1.05);
+}
+
 .btn-zero {
     grid-column: span 2;
 }
