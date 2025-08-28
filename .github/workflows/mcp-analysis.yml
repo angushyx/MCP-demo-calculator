@@ -34,7 +34,14 @@ jobs:
           BRANCH_NAME="${{ github.head_ref }}"
           PR_NUMBER="${{ github.event.pull_request.number }}"
         else
-          BASE_SHA="${{ github.event.before }}"
+          # 處理新分支推送的情況
+          BEFORE_SHA="${{ github.event.before }}"
+          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BEFORE_SHA" ]; then
+            # 新分支，與 main 比較
+            BASE_SHA="origin/main"
+          else
+            BASE_SHA="$BEFORE_SHA"
+          fi
           HEAD_SHA="${{ github.sha }}"
           BRANCH_NAME="${{ github.ref_name }}"
           PR_NUMBER=""
@@ -46,7 +53,13 @@ jobs:
         echo "pr-number=${PR_NUMBER}" >> $GITHUB_OUTPUT
         
         # 生成 diff (限制大小避免 API 超限)
-        git diff ${BASE_SHA}...${HEAD_SHA} --unified=3 > /tmp/changes.diff
+        if [ "$BASE_SHA" = "origin/main" ]; then
+          # 新分支情況：比較當前分支與 main
+          git diff origin/main...HEAD --unified=3 > /tmp/changes.diff || git diff HEAD~1 --unified=3 > /tmp/changes.diff
+        else
+          # 正常情況：比較兩個提交
+          git diff ${BASE_SHA}...${HEAD_SHA} --unified=3 > /tmp/changes.diff || git diff HEAD~1 --unified=3 > /tmp/changes.diff
+        fi
         
         # 檢查 diff 大小並截斷如果太大
         if [ $(wc -c < /tmp/changes.diff) -gt 50000 ]; then
@@ -58,9 +71,15 @@ jobs:
         # diff 內容已保存在 /tmp/changes.diff 中，無需環境變數
         
         # 獲取變更統計
-        CHANGED_FILES=$(git diff --name-only ${BASE_SHA}...${HEAD_SHA} | wc -l)
-        INSERTIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || echo "0")
-        DELETIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || echo "0")
+        if [ "$BASE_SHA" = "origin/main" ]; then
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | wc -l || git diff --name-only HEAD~1 | wc -l)
+          INSERTIONS=$(git diff --shortstat origin/main...HEAD | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || echo "0")
+          DELETIONS=$(git diff --shortstat origin/main...HEAD | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || echo "0")
+        else
+          CHANGED_FILES=$(git diff --name-only ${BASE_SHA}...${HEAD_SHA} | wc -l || git diff --name-only HEAD~1 | wc -l)
+          INSERTIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || echo "0")
+          DELETIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || echo "0")
+        fi
         
         echo "changed-files=${CHANGED_FILES}" >> $GITHUB_OUTPUT
         echo "insertions=${INSERTIONS}" >> $GITHUB_OUTPUT
