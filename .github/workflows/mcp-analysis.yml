@@ -75,10 +75,16 @@ jobs:
       id: ai-analysis
       if: env.DIFF_CONTENT != ''
       run: |
+        # 安裝 jq 如果需要
+        if ! command -v jq &> /dev/null; then
+          sudo apt-get update && sudo apt-get install -y jq
+        fi
+        
         # 準備分析請求
-        ANALYSIS_PAYLOAD=$(cat << 'EOF'
+        DIFF_ESCAPED=$(echo '${{ env.DIFF_CONTENT }}' | jq -R -s .)
+        ANALYSIS_PAYLOAD=$(cat << EOF
         {
-          "diff": "${{ env.DIFF_CONTENT }}",
+          "diff": ${DIFF_ESCAPED},
           "metadata": {
             "repository": "${{ github.repository }}",
             "branch": "${{ steps.git-diff.outputs.branch-name }}",
@@ -110,10 +116,12 @@ jobs:
       if: steps.ai-analysis.outputs.analysis-result != ''
       run: |
         # 生成文檔補丁
-        DOC_PAYLOAD=$(cat << 'EOF'
+        DIFF_ESCAPED=$(echo '${{ env.DIFF_CONTENT }}' | jq -R -s .)
+        ANALYSIS_ESCAPED=$(echo '${{ steps.ai-analysis.outputs.analysis-result }}' | jq -c '.' || echo '{}')
+        DOC_PAYLOAD=$(cat << EOF
         {
-          "diff": "${{ env.DIFF_CONTENT }}",
-          "analysis_result": ${{ steps.ai-analysis.outputs.analysis-result }},
+          "diff": ${DIFF_ESCAPED},
+          "analysis_result": ${ANALYSIS_ESCAPED},
           "version": "${{ github.ref_name }}-${{ github.run_number }}",
           "metadata": {
             "repository": "${{ github.repository }}",

@@ -186,9 +186,10 @@ document.addEventListener('keydown', function(event) {
 });
 
 // 版本資訊
-console.log('🧮 MCP Demo Calculator v1.0.0');
+console.log('🧮 MCP Demo Calculator v1.1.0 - Enhanced Edition');
 console.log('🤖 Integrated with MCP CI/CD Pipeline');
 console.log('🚀 Ready for automated release notes generation!');
+console.log('✨ New: Advanced functions & improved UI');
 
 // 導出供測試使用
 if (typeof module !== 'undefined' && module.exports) {
