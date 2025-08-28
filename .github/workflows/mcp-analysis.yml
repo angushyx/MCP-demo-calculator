@@ -55,12 +55,10 @@ jobs:
           mv /tmp/changes_truncated.diff /tmp/changes.diff
         fi
         
-        # 將 diff 內容存為環境變數 (處理多行)
-        {
-          echo 'DIFF_CONTENT<<EOF'
-          cat /tmp/changes.diff
-          echo EOF
-        } >> $GITHUB_ENV
+        # 將 diff 內容存為環境變數 (處理多行) - 修正語法
+        echo 'DIFF_CONTENT<<EOF' >> $GITHUB_ENV
+        cat /tmp/changes.diff >> $GITHUB_ENV
+        echo 'EOF' >> $GITHUB_ENV
         
         # 獲取變更統計
         CHANGED_FILES=$(git diff --name-only ${BASE_SHA}...${HEAD_SHA} | wc -l)
@@ -80,31 +78,52 @@ jobs:
           sudo apt-get update && sudo apt-get install -y jq
         fi
         
-        # 準備分析請求
-        DIFF_ESCAPED=$(echo '${{ env.DIFF_CONTENT }}' | jq -R -s .)
-        ANALYSIS_PAYLOAD=$(cat << EOF
+        # 準備分析請求 - 使用 jq 來安全處理 JSON
+        cat > /tmp/analysis_payload.json << 'EOF'
         {
-          "diff": ${DIFF_ESCAPED},
+          "diff": "",
           "metadata": {
-            "repository": "${{ github.repository }}",
-            "branch": "${{ steps.git-diff.outputs.branch-name }}",
-            "commit": "${{ steps.git-diff.outputs.head-sha }}",
-            "pr_number": "${{ steps.git-diff.outputs.pr-number }}",
-            "author": "${{ github.actor }}",
-            "changed_files": ${{ steps.git-diff.outputs.changed-files }},
-            "insertions": ${{ steps.git-diff.outputs.insertions }},
-            "deletions": ${{ steps.git-diff.outputs.deletions }},
-            "event_type": "${{ github.event_name }}"
+            "repository": "",
+            "branch": "",
+            "commit": "",
+            "pr_number": "",
+            "author": "",
+            "changed_files": 0,
+            "insertions": 0,
+            "deletions": 0,
+            "event_type": ""
           }
         }
         EOF
-        )
+        
+        # 使用 jq 安全地插入變數值
+        jq --arg diff "$DIFF_CONTENT" \
+           --arg repo "${{ github.repository }}" \
+           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
+           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
+           --arg pr_number "${{ steps.git-diff.outputs.pr-number }}" \
+           --arg author "${{ github.actor }}" \
+           --argjson changed_files "${{ steps.git-diff.outputs.changed-files }}" \
+           --argjson insertions "${{ steps.git-diff.outputs.insertions }}" \
+           --argjson deletions "${{ steps.git-diff.outputs.deletions }}" \
+           --arg event_type "${{ github.event_name }}" \
+           '.diff = $diff | 
+            .metadata.repository = $repo |
+            .metadata.branch = $branch |
+            .metadata.commit = $commit |
+            .metadata.pr_number = $pr_number |
+            .metadata.author = $author |
+            .metadata.changed_files = $changed_files |
+            .metadata.insertions = $insertions |
+            .metadata.deletions = $deletions |
+            .metadata.event_type = $event_type' \
+           /tmp/analysis_payload.json > /tmp/analysis_request.json
         
         # 調用 MCP 分析 API
         ANALYSIS_RESULT=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/analyze" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d "$ANALYSIS_PAYLOAD" || echo '{"error": "API call failed"}')
+          -d @/tmp/analysis_request.json || echo '{"error": "API call failed"}')
         
         echo "analysis-result=${ANALYSIS_RESULT}" >> $GITHUB_OUTPUT
         
@@ -115,26 +134,39 @@ jobs:
       id: doc-generation
       if: steps.ai-analysis.outputs.analysis-result != ''
       run: |
-        # 生成文檔補丁
-        DIFF_ESCAPED=$(echo '${{ env.DIFF_CONTENT }}' | jq -R -s .)
-        ANALYSIS_ESCAPED=$(echo '${{ steps.ai-analysis.outputs.analysis-result }}' | jq -c '.' || echo '{}')
-        DOC_PAYLOAD=$(cat << EOF
+        # 生成文檔補丁 - 使用 jq 安全處理 JSON
+        cat > /tmp/doc_template.json << 'EOF'
         {
-          "diff": ${DIFF_ESCAPED},
-          "analysis_result": ${ANALYSIS_ESCAPED},
-          "version": "${{ github.ref_name }}-${{ github.run_number }}",
+          "diff": "",
+          "analysis_result": {},
+          "version": "",
           "metadata": {
-            "repository": "${{ github.repository }}",
-            "commit": "${{ steps.git-diff.outputs.head-sha }}"
+            "repository": "",
+            "commit": ""
           }
         }
         EOF
-        )
+        
+        # 讀取分析結果
+        ANALYSIS_JSON=$(cat /tmp/analysis_result.json 2>/dev/null || echo '{}')
+        
+        # 使用 jq 安全地構建請求
+        jq --arg diff "$DIFF_CONTENT" \
+           --argjson analysis "$ANALYSIS_JSON" \
+           --arg version "${{ github.ref_name }}-${{ github.run_number }}" \
+           --arg repo "${{ github.repository }}" \
+           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
+           '.diff = $diff | 
+            .analysis_result = $analysis |
+            .version = $version |
+            .metadata.repository = $repo |
+            .metadata.commit = $commit' \
+           /tmp/doc_template.json > /tmp/doc_request.json
         
         DOC_PATCH=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/generate-docs" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d "$DOC_PAYLOAD")
+          -d @/tmp/doc_request.json || echo '{"error": "Doc generation failed"}')
         
         echo "doc-patch=${DOC_PATCH}" >> $GITHUB_OUTPUT
 
@@ -145,29 +177,57 @@ jobs:
         VERSION_TAG="${{ github.ref_name }}-v${{ github.run_number }}"
         RELEASE_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
         
-        NOTION_PAYLOAD=$(cat << EOF
+        # 使用 jq 安全地構建 Notion 請求
+        cat > /tmp/notion_template.json << 'EOF'
         {
-          "version": "${VERSION_TAG}",
-          "release_date": "${RELEASE_DATE}",
-          "repository": "${{ github.repository }}",
-          "commit": "${{ steps.git-diff.outputs.head-sha }}",
-          "author": "${{ github.actor }}",
-          "branch": "${{ steps.git-diff.outputs.branch-name }}",
-          "analysis": ${{ steps.ai-analysis.outputs.analysis-result }},
-          "documentation": "${{ steps.doc-generation.outputs.doc-patch }}",
+          "version": "",
+          "release_date": "",
+          "repository": "",
+          "commit": "",
+          "author": "",
+          "branch": "",
+          "analysis": {},
+          "documentation": "",
           "stats": {
-            "changed_files": ${{ steps.git-diff.outputs.changed-files }},
-            "insertions": ${{ steps.git-diff.outputs.insertions }},
-            "deletions": ${{ steps.git-diff.outputs.deletions }}
+            "changed_files": 0,
+            "insertions": 0,
+            "deletions": 0
           }
         }
         EOF
-        )
+        
+        # 讀取分析結果和文檔補丁
+        ANALYSIS_JSON=$(cat /tmp/analysis_result.json 2>/dev/null || echo '{}')
+        DOC_PATCH="${{ steps.doc-generation.outputs.doc-patch }}"
+        
+        jq --arg version "$VERSION_TAG" \
+           --arg date "$RELEASE_DATE" \
+           --arg repo "${{ github.repository }}" \
+           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
+           --arg author "${{ github.actor }}" \
+           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
+           --argjson analysis "$ANALYSIS_JSON" \
+           --arg docs "$DOC_PATCH" \
+           --argjson changed_files "${{ steps.git-diff.outputs.changed-files }}" \
+           --argjson insertions "${{ steps.git-diff.outputs.insertions }}" \
+           --argjson deletions "${{ steps.git-diff.outputs.deletions }}" \
+           '.version = $version |
+            .release_date = $date |
+            .repository = $repo |
+            .commit = $commit |
+            .author = $author |
+            .branch = $branch |
+            .analysis = $analysis |
+            .documentation = $docs |
+            .stats.changed_files = $changed_files |
+            .stats.insertions = $insertions |
+            .stats.deletions = $deletions' \
+           /tmp/notion_template.json > /tmp/notion_request.json
         
         NOTION_RESULT=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/create-release-page" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d "$NOTION_PAYLOAD")
+          -d @/tmp/notion_request.json || echo '{"error": "Notion API failed"}')
         
         echo "notion-result=${NOTION_RESULT}" >> $GITHUB_OUTPUT
         
@@ -180,11 +240,12 @@ jobs:
       run: |
         COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
         VERSION_TAG="${{ github.ref_name }}-v${{ github.run_number }}"
+        COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
         
-        # 準備 Slack 訊息
-        SLACK_PAYLOAD=$(cat << EOF
+        # 使用 jq 安全地構建 Slack 訊息
+        cat > /tmp/slack_template.json << 'EOF'
         {
-          "text": "🧮 Calculator App Release: ${VERSION_TAG}",
+          "text": "",
           "blocks": [
             {
               "type": "header",
@@ -198,19 +259,19 @@ jobs:
               "fields": [
                 {
                   "type": "mrkdwn",
-                  "text": "*Repository:*\n${{ github.repository }}"
+                  "text": "*Repository:*\n"
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Version:*\n${VERSION_TAG}"
+                  "text": "*Version:*\n"
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Author:*\n${{ github.actor }}"
+                  "text": "*Author:*\n"
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Branch:*\n${{ steps.git-diff.outputs.branch-name }}"
+                  "text": "*Branch:*\n"
                 }
               ]
             },
@@ -218,7 +279,7 @@ jobs:
               "type": "section",
               "text": {
                 "type": "mrkdwn",
-                "text": "*Commit Message:*\n${COMMIT_MESSAGE}"
+                "text": "*Commit Message:*\n"
               }
             },
             {
@@ -226,15 +287,15 @@ jobs:
               "fields": [
                 {
                   "type": "mrkdwn",
-                  "text": "*Files Changed:* ${{ steps.git-diff.outputs.changed-files }}"
+                  "text": "*Files Changed:* 0"
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Insertions:* +${{ steps.git-diff.outputs.insertions }}"
+                  "text": "*Insertions:* +0"
                 },
                 {
                   "type": "mrkdwn",
-                  "text": "*Deletions:* -${{ steps.git-diff.outputs.deletions }}"
+                  "text": "*Deletions:* -0"
                 }
               ]
             },
@@ -247,7 +308,7 @@ jobs:
                     "type": "plain_text",
                     "text": "📋 View Release Notes"
                   },
-                  "url": "${{ steps.notion-page.outputs.notion-url }}"
+                  "url": ""
                 },
                 {
                   "type": "button",
@@ -255,7 +316,7 @@ jobs:
                     "type": "plain_text",
                     "text": "💻 View Commit"
                   },
-                  "url": "${{ github.event.head_commit.url }}"
+                  "url": ""
                 }
               ]
             },
@@ -271,12 +332,35 @@ jobs:
           ]
         }
         EOF
-        )
+        
+        jq --arg text "🧮 Calculator App Release: $VERSION_TAG" \
+           --arg repo "${{ github.repository }}" \
+           --arg version "$VERSION_TAG" \
+           --arg author "${{ github.actor }}" \
+           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
+           --arg commit_msg "$COMMIT_MESSAGE" \
+           --arg files "${{ steps.git-diff.outputs.changed-files }}" \
+           --arg insertions "${{ steps.git-diff.outputs.insertions }}" \
+           --arg deletions "${{ steps.git-diff.outputs.deletions }}" \
+           --arg notion_url "${{ steps.notion-page.outputs.notion-url }}" \
+           --arg commit_url "$COMMIT_URL" \
+           '.text = $text |
+            .blocks[1].fields[0].text = "*Repository:*\n" + $repo |
+            .blocks[1].fields[1].text = "*Version:*\n" + $version |
+            .blocks[1].fields[2].text = "*Author:*\n" + $author |
+            .blocks[1].fields[3].text = "*Branch:*\n" + $branch |
+            .blocks[2].text.text = "*Commit Message:*\n" + $commit_msg |
+            .blocks[3].fields[0].text = "*Files Changed:* " + $files |
+            .blocks[3].fields[1].text = "*Insertions:* +" + $insertions |
+            .blocks[3].fields[2].text = "*Deletions:* -" + $deletions |
+            .blocks[4].elements[0].url = $notion_url |
+            .blocks[4].elements[1].url = $commit_url' \
+           /tmp/slack_template.json > /tmp/slack_payload.json
         
         # 發送 Slack 通知
         curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
           -H "Content-Type: application/json" \
-          -d "$SLACK_PAYLOAD"
+          -d @/tmp/slack_payload.json
 
     - name: 📝 PR Comment (for Pull Requests)
       if: github.event_name == 'pull_request'
