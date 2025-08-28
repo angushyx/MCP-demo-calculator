@@ -182,6 +182,155 @@ body {
     grid-column: span 2;
 }
 
+/* 貨幣轉換器樣式 */
+.currency-converter {
+    margin-top: 30px;
+    padding: 25px;
+    background: linear-gradient(145deg, #f8fafc, #e2e8f0);
+    border-radius: 15px;
+    border: 1px solid #cbd5e0;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.currency-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.currency-header h2 {
+    color: #2d3748;
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.update-time {
+    font-size: 0.8em;
+    color: #718096;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.currency-input-group {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr auto 1.5fr;
+    gap: 15px;
+    align-items: end;
+    margin-bottom: 20px;
+}
+
+.currency-input label,
+.currency-select label {
+    display: block;
+    font-size: 0.9em;
+    color: #4a5568;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.currency-input input,
+.currency-select select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1em;
+    background: white;
+    color: #2d3748;
+    transition: border-color 0.2s;
+}
+
+.currency-input input:focus,
+.currency-select select:focus {
+    outline: none;
+    border-color: #4299e1;
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.btn-swap {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2em;
+    background: linear-gradient(145deg, #ed8936, #dd6b20);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 8px rgba(237, 137, 54, 0.3);
+}
+
+.btn-swap:hover {
+    background: linear-gradient(145deg, #dd6b20, #c05621);
+    transform: rotate(180deg) translateY(-2px);
+}
+
+.btn-convert {
+    width: 100%;
+    height: 50px;
+    background: linear-gradient(145deg, #38b2ac, #319795);
+    color: white;
+    font-size: 1.1em;
+    font-weight: 600;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(56, 178, 172, 0.3);
+    margin-bottom: 20px;
+}
+
+.btn-convert:hover {
+    background: linear-gradient(145deg, #319795, #2c7a7b);
+}
+
+.conversion-result {
+    background: linear-gradient(145deg, #ffffff, #f7fafc);
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    font-size: 1.1em;
+    color: #2d3748;
+    margin-bottom: 25px;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.popular-rates h3 {
+    color: #2d3748;
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.popular-rates #popular-rates {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.rate-item {
+    background: rgba(255, 255, 255, 0.8);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+.rate-item:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .footer {
     text-align: center;
     margin-top: 20px;
@@ -224,6 +373,38 @@ body {
     .buttons {
         gap: 10px;
     }
+    
+    /* 貨幣轉換器響應式 */
+    .currency-converter {
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .currency-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .currency-header h2 {
+        font-size: 1.2em;
+    }
+    
+    .currency-input-group {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .btn-swap {
+        width: 100%;
+        height: 40px;
+        border-radius: 8px;
+        order: 3;
+    }
+    
+    .popular-rates #popular-rates {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* 暗色主題支援 */
@@ -255,5 +436,49 @@ body {
     
     .btn-number:hover {
         background: linear-gradient(145deg, #2d3748, #1a202c);
+    }
+    
+    /* 貨幣轉換器暗色主題 */
+    .currency-converter {
+        background: linear-gradient(145deg, #2d3748, #4a5568);
+        border-color: #4a5568;
+    }
+    
+    .currency-header h2,
+    .popular-rates h3 {
+        color: #e2e8f0;
+    }
+    
+    .update-time {
+        background: rgba(26, 32, 44, 0.7);
+        color: #cbd5e0;
+    }
+    
+    .currency-input label,
+    .currency-select label {
+        color: #cbd5e0;
+    }
+    
+    .currency-input input,
+    .currency-select select {
+        background: #1a202c;
+        color: #e2e8f0;
+        border-color: #4a5568;
+    }
+    
+    .conversion-result {
+        background: linear-gradient(145deg, #1a202c, #2d3748);
+        color: #e2e8f0;
+        border-color: #4a5568;
+    }
+    
+    .rate-item {
+        background: rgba(26, 32, 44, 0.8);
+        color: #cbd5e0;
+        border-color: #4a5568;
+    }
+    
+    .rate-item:hover {
+        background: rgba(26, 32, 44, 1);
     }
 }

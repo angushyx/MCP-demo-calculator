@@ -53,6 +53,52 @@
                 <button class="btn btn-advanced" onclick="appendToDisplay(')')">)</button>
             </div>
             
+            <!-- 貨幣轉換器 -->
+            <div class="currency-converter">
+                <div class="currency-header">
+                    <h2>💱 即時匯率轉換</h2>
+                    <span class="update-time">最後更新: <span id="rate-update-time">載入中...</span></span>
+                </div>
+                
+                <div class="currency-input-group">
+                    <div class="currency-input">
+                        <label for="currency-amount">金額</label>
+                        <input type="number" id="currency-amount" placeholder="輸入金額" min="0" step="0.01">
+                    </div>
+                    
+                    <div class="currency-select">
+                        <label for="currency-from">從</label>
+                        <select id="currency-from">
+                            <!-- 選項將由 JavaScript 動態填充 -->
+                        </select>
+                    </div>
+                    
+                    <div class="swap-button">
+                        <button class="btn btn-swap" onclick="swapCurrencies()" title="交換貨幣">⇄</button>
+                    </div>
+                    
+                    <div class="currency-select">
+                        <label for="currency-to">到</label>
+                        <select id="currency-to">
+                            <!-- 選項將由 JavaScript 動態填充 -->
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn btn-convert" onclick="convertCurrency()">轉換</button>
+                
+                <div class="conversion-result" id="conversion-result">
+                    輸入金額並選擇貨幣進行轉換
+                </div>
+                
+                <div class="popular-rates">
+                    <h3>🔥 熱門匯率</h3>
+                    <div id="popular-rates">
+                        <!-- 熱門匯率將由 JavaScript 動態填充 -->
+                    </div>
+                </div>
+            </div>
+
             <div class="footer">
                 <p>🤖 Powered by MCP CI/CD Pipeline</p>
             </div>
@@ -60,5 +106,6 @@
     </div>
     
     <script src="src/calculator.js"></script>
+    <script src="src/currency.js"></script>
 </body>
 </html>
