@@ -1,0 +1,41 @@
+name: 🧪 Test Minimal Pipeline
+
+on:
+  push:
+    branches: ['feature/history-viewer']
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: 🔍 Basic Analysis
+        run: |
+          echo "🧮 MCP Calculator Pipeline Test"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          
+          # 簡單的變更檢測
+          CHANGED_FILES=$(git diff --name-only HEAD~1 | wc -l)
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          
+          echo "Changed files: $CHANGED_FILES"
+          echo "Commit message: $COMMIT_MSG"
+          
+          if [ $CHANGED_FILES -gt 0 ]; then
+            echo "✅ Changes detected, pipeline working!"
+            git diff --stat HEAD~1
+          else
+            echo "⚠️ No changes detected"
+          fi
+
+      - name: 🎯 Success
+        run: |
+          echo "🎉 Minimal pipeline test successful!"
+          echo "The workflow is working correctly."

@@ -26,7 +26,6 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
 
     - name: 📊 Get Changes
       id: changes
@@ -59,6 +58,7 @@ jobs:
         echo "head-ref=$HEAD" >> $GITHUB_OUTPUT
 
     - name: 🤖 MCP Analysis
+      id: mcp-analysis
       if: steps.changes.outputs.changed-files != '0'
       uses: actions/github-script@v7
       with:
@@ -165,46 +165,22 @@ jobs:
           fs.writeFileSync('RELEASE_NOTES.md', releaseNotes);
 
     - name: 💬 Slack Notification
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.SLACK_WEBHOOK_URL
-      uses: 8398a7/action-slack@v3
-      with:
-        status: success
-        custom_payload: |
-          {
-            "text": "🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}",
-            "attachments": [{
-              "color": "good",
-              "fields": [
-                {
-                  "title": "Repository",
-                  "value": "${{ github.repository }}",
-                  "short": true
-                },
-                {
-                  "title": "Branch", 
-                  "value": "${{ github.ref_name }}",
-                  "short": true
-                },
-                {
-                  "title": "Author",
-                  "value": "${{ github.actor }}",
-                  "short": true
-                },
-                {
-                  "title": "Changes",
-                  "value": "${{ steps.changes.outputs.changed-files }} files, +${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }} lines",
-                  "short": true
-                }
-              ],
-              "actions": [{
-                "type": "button",
-                "text": "View Commit",
-                "url": "${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
-              }]
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.SLACK_WEBHOOK_URL
+      run: |
+        curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"text\": \"🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}\",
+            \"attachments\": [{
+              \"color\": \"good\",
+              \"fields\": [
+                {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
+                {\"title\": \"Author\", \"value\": \"${{ github.actor }}\", \"short\": true},
+                {\"title\": \"Files\", \"value\": \"${{ steps.changes.outputs.changed-files }} files\", \"short\": true},
+                {\"title\": \"Changes\", \"value\": \"+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }}\", \"short\": true}
+              ]
             }]
-          }
-      env:
-        SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
+          }" || echo "Slack notification failed"
 
     - name: 📋 PR Comment
       if: github.event_name == 'pull_request'
