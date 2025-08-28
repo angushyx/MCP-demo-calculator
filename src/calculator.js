@@ -121,6 +121,19 @@ class Calculator {
         }
     }
 
+    // 快速貨幣轉換功能
+    quickCurrencyConvert(amount, fromCurrency, toCurrency) {
+        if (typeof currencyConverter !== 'undefined' && currencyConverter) {
+            try {
+                return currencyConverter.convert(amount, fromCurrency, toCurrency);
+            } catch (error) {
+                console.error('快速貨幣轉換失敗:', error);
+                return null;
+            }
+        }
+        return null;
+    }
+
     getHistory() {
         return this.history;
     }
