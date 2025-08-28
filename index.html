@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Demo Calculator</title>
+    <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+    <div class="calculator-container">
+        <div class="calculator">
+            <div class="header">
+                <h1>🧮 MCP Calculator</h1>
+                <p>Demo with AI-powered CI/CD</p>
+            </div>
+            
+            <div class="display">
+                <input type="text" id="display" readonly placeholder="0">
+            </div>
+            
+            <div class="buttons">
+                <button class="btn btn-clear" onclick="clearDisplay()">C</button>
+                <button class="btn btn-operator" onclick="clearEntry()">CE</button>
+                <button class="btn btn-operator" onclick="deleteLast()">⌫</button>
+                <button class="btn btn-operator" onclick="appendToDisplay('/')">/</button>
+                
+                <button class="btn btn-number" onclick="appendToDisplay('7')">7</button>
+                <button class="btn btn-number" onclick="appendToDisplay('8')">8</button>
+                <button class="btn btn-number" onclick="appendToDisplay('9')">9</button>
+                <button class="btn btn-operator" onclick="appendToDisplay('*')">×</button>
+                
+                <button class="btn btn-number" onclick="appendToDisplay('4')">4</button>
+                <button class="btn btn-number" onclick="appendToDisplay('5')">5</button>
+                <button class="btn btn-number" onclick="appendToDisplay('6')">6</button>
+                <button class="btn btn-operator" onclick="appendToDisplay('-')">-</button>
+                
+                <button class="btn btn-number" onclick="appendToDisplay('1')">1</button>
+                <button class="btn btn-number" onclick="appendToDisplay('2')">2</button>
+                <button class="btn btn-number" onclick="appendToDisplay('3')">3</button>
+                <button class="btn btn-operator" onclick="appendToDisplay('+')">+</button>
+                
+                <button class="btn btn-number btn-zero" onclick="appendToDisplay('0')">0</button>
+                <button class="btn btn-number" onclick="appendToDisplay('.')">.</button>
+                <button class="btn btn-equals" onclick="calculate()">=</button>
+            </div>
+            
+            <div class="advanced-buttons">
+                <button class="btn btn-advanced" onclick="appendToDisplay('sqrt(')">√</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('pow(')">x²</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('sin(')">sin</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('cos(')">cos</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('(')">(</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay(')')">)</button>
+            </div>
+            
+            <div class="footer">
+                <p>🤖 Powered by MCP CI/CD Pipeline</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="src/calculator.js"></script>
+</body>
+</html>
