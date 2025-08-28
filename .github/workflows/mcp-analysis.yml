@@ -1,413 +1,230 @@
-name: 🤖 MCP Code Analysis & Documentation
+name: 🚀 Modern MCP Calculator Pipeline
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [main, develop, 'feature/*']
   pull_request:
-    branches: [ main, develop ]
-    types: [opened, synchronize, reopened]
+    branches: [main, develop]
 
 env:
-  MCP_SERVICE_URL: ${{ secrets.MCP_SERVICE_URL }}
+  MCP_SERVICE_URL: ${{ secrets.MCP_SERVICE_URL || 'http://localhost:3001' }}
   NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-  NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
   SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 jobs:
-  mcp-analysis:
+  analyze:
+    name: 🔍 Code Analysis & Auto Documentation
     runs-on: ubuntu-latest
-    name: 🔍 Code Analysis & Doc Generation
     
     steps:
-    - name: 📥 Checkout Code
+    - name: 📦 Checkout
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 需要完整歷史來生成 diff
-    
-    - name: 🔍 Generate Git Diff
-      id: git-diff
+        fetch-depth: 0
+
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: 📊 Get Changes
+      id: changes
       run: |
-        # 獲取與 main branch 的差異
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          BRANCH_NAME="${{ github.head_ref }}"
-          PR_NUMBER="${{ github.event.pull_request.number }}"
+        # 使用 GitHub API 獲取變更信息，更可靠
+        if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
         else
-          # 處理新分支推送的情況
-          BEFORE_SHA="${{ github.event.before }}"
-          if [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ] || [ -z "$BEFORE_SHA" ]; then
-            # 新分支，與 main 比較
-            BASE_SHA="origin/main"
-          else
-            BASE_SHA="$BEFORE_SHA"
-          fi
-          HEAD_SHA="${{ github.sha }}"
-          BRANCH_NAME="${{ github.ref_name }}"
-          PR_NUMBER=""
+          # 對於 push 事件，比較與 main 的差異
+          BASE="origin/main"
+          HEAD="${{ github.sha }}"
         fi
         
-        echo "base-sha=${BASE_SHA}" >> $GITHUB_OUTPUT
-        echo "head-sha=${HEAD_SHA}" >> $GITHUB_OUTPUT
-        echo "branch-name=${BRANCH_NAME}" >> $GITHUB_OUTPUT
-        echo "pr-number=${PR_NUMBER}" >> $GITHUB_OUTPUT
+        # 生成變更摘要
+        git diff --name-only $BASE...$HEAD > changed_files.txt
+        git diff --stat $BASE...$HEAD > diff_stats.txt
         
-        # 生成 diff (限制大小避免 API 超限)
-        if [ "$BASE_SHA" = "origin/main" ]; then
-          # 新分支情況：比較當前分支與 main
-          git diff origin/main...HEAD --unified=3 > /tmp/changes.diff || git diff HEAD~1 --unified=3 > /tmp/changes.diff
-        else
-          # 正常情況：比較兩個提交
-          git diff ${BASE_SHA}...${HEAD_SHA} --unified=3 > /tmp/changes.diff || git diff HEAD~1 --unified=3 > /tmp/changes.diff
-        fi
+        # 提取統計信息
+        CHANGED_FILES=$(wc -l < changed_files.txt)
+        STATS=$(git diff --shortstat $BASE...$HEAD)
+        INSERTIONS=$(echo "$STATS" | grep -o '[0-9]\+ insertions\?' | grep -o '[0-9]\+' || echo "0")
+        DELETIONS=$(echo "$STATS" | grep -o '[0-9]\+ deletions\?' | grep -o '[0-9]\+' || echo "0")
         
-        # 檢查 diff 大小並截斷如果太大
-        if [ $(wc -c < /tmp/changes.diff) -gt 50000 ]; then
-          head -c 45000 /tmp/changes.diff > /tmp/changes_truncated.diff
-          echo "... [TRUNCATED - DIFF TOO LARGE]" >> /tmp/changes_truncated.diff
-          mv /tmp/changes_truncated.diff /tmp/changes.diff
-        fi
-        
-        # diff 內容已保存在 /tmp/changes.diff 中，無需環境變數
-        
-        # 獲取變更統計
-        if [ "$BASE_SHA" = "origin/main" ]; then
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | wc -l || git diff --name-only HEAD~1 | wc -l)
-          INSERTIONS=$(git diff --shortstat origin/main...HEAD | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || echo "0")
-          DELETIONS=$(git diff --shortstat origin/main...HEAD | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || echo "0")
-        else
-          CHANGED_FILES=$(git diff --name-only ${BASE_SHA}...${HEAD_SHA} | wc -l || git diff --name-only HEAD~1 | wc -l)
-          INSERTIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ insertions?' | grep -oE '[0-9]+' || echo "0")
-          DELETIONS=$(git diff --shortstat ${BASE_SHA}...${HEAD_SHA} | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || git diff --shortstat HEAD~1 | grep -oE '[0-9]+ deletions?' | grep -oE '[0-9]+' || echo "0")
-        fi
-        
-        echo "changed-files=${CHANGED_FILES}" >> $GITHUB_OUTPUT
-        echo "insertions=${INSERTIONS}" >> $GITHUB_OUTPUT
-        echo "deletions=${DELETIONS}" >> $GITHUB_OUTPUT
+        # 設置輸出
+        echo "changed-files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+        echo "insertions=$INSERTIONS" >> $GITHUB_OUTPUT  
+        echo "deletions=$DELETIONS" >> $GITHUB_OUTPUT
+        echo "base-ref=$BASE" >> $GITHUB_OUTPUT
+        echo "head-ref=$HEAD" >> $GITHUB_OUTPUT
 
-    - name: 🤖 AI Code Analysis
-      id: ai-analysis
-      if: steps.git-diff.outputs.changed-files != '0'
-      run: |
-        # 安裝 jq 如果需要
-        if ! command -v jq &> /dev/null; then
-          sudo apt-get update && sudo apt-get install -y jq
-        fi
-        
-        # 準備分析請求 - 使用 jq 來安全處理 JSON
-        cat > /tmp/analysis_payload.json << 'EOF'
-        {
-          "diff": "",
-          "metadata": {
-            "repository": "",
-            "branch": "",
-            "commit": "",
-            "pr_number": "",
-            "author": "",
-            "changed_files": 0,
-            "insertions": 0,
-            "deletions": 0,
-            "event_type": ""
-          }
-        }
-        EOF
-        
-        # 使用 jq 安全地插入變數值 - 從文件讀取 diff 避免命令行長度限制
-        cat /tmp/changes.diff | jq -Rs --arg repo "${{ github.repository }}" \
-           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
-           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
-           --arg pr_number "${{ steps.git-diff.outputs.pr-number }}" \
-           --arg author "${{ github.actor }}" \
-           --argjson changed_files "${{ steps.git-diff.outputs.changed-files }}" \
-           --argjson insertions "${{ steps.git-diff.outputs.insertions }}" \
-           --argjson deletions "${{ steps.git-diff.outputs.deletions }}" \
-           --arg event_type "${{ github.event_name }}" \
-           '{
-              "diff": .,
-              "metadata": {
-                "repository": $repo,
-                "branch": $branch,
-                "commit": $commit,
-                "pr_number": $pr_number,
-                "author": $author,
-                "changed_files": $changed_files,
-                "insertions": $insertions,
-                "deletions": $deletions,
-                "event_type": $event_type
+    - name: 🤖 MCP Analysis
+      if: steps.changes.outputs.changed-files != '0'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const { execSync } = require('child_process');
+          
+          try {
+            // 生成 diff
+            const diffOutput = execSync(`git diff ${{ steps.changes.outputs.base-ref }}...${{ steps.changes.outputs.head-ref }}`, 
+              { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+            
+            // 準備分析數據
+            const analysisData = {
+              diff: diffOutput.slice(0, 50000), // 限制大小
+              metadata: {
+                repository: context.repo.owner + '/' + context.repo.repo,
+                branch: '${{ github.ref_name }}',
+                commit: '${{ github.sha }}',
+                author: '${{ github.actor }}',
+                changed_files: parseInt('${{ steps.changes.outputs.changed-files }}'),
+                insertions: parseInt('${{ steps.changes.outputs.insertions }}'),
+                deletions: parseInt('${{ steps.changes.outputs.deletions }}'),
+                event_type: '${{ github.event_name }}'
               }
-            }' > /tmp/analysis_request.json
-        
-        # 調用 MCP 分析 API
-        ANALYSIS_RESULT=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/analyze" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d @/tmp/analysis_request.json || echo '{"error": "API call failed"}')
-        
-        echo "analysis-result=${ANALYSIS_RESULT}" >> $GITHUB_OUTPUT
-        
-        # 儲存分析結果到檔案
-        echo "${ANALYSIS_RESULT}" > /tmp/analysis_result.json
-
-    - name: 📝 Generate Documentation Patch
-      id: doc-generation
-      if: steps.ai-analysis.outputs.analysis-result != ''
-      run: |
-        # 生成文檔補丁 - 使用 jq 安全處理 JSON
-        cat > /tmp/doc_template.json << 'EOF'
-        {
-          "diff": "",
-          "analysis_result": {},
-          "version": "",
-          "metadata": {
-            "repository": "",
-            "commit": ""
-          }
-        }
-        EOF
-        
-        # 讀取分析結果
-        ANALYSIS_JSON=$(cat /tmp/analysis_result.json 2>/dev/null || echo '{}')
-        
-        # 使用 jq 安全地構建請求 - 從文件讀取 diff
-        cat /tmp/changes.diff | jq -Rs --argjson analysis "$ANALYSIS_JSON" \
-           --arg version "${{ github.ref_name }}-${{ github.run_number }}" \
-           --arg repo "${{ github.repository }}" \
-           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
-           '{
-              "diff": .,
-              "analysis_result": $analysis,
-              "version": $version,
-              "metadata": {
-                "repository": $repo,
-                "commit": $commit
+            };
+            
+            console.log('📊 Analysis data prepared:', {
+              diffSize: analysisData.diff.length,
+              changedFiles: analysisData.metadata.changed_files
+            });
+            
+            // 調用 MCP 服務 (如果可用)
+            if (process.env.MCP_SERVICE_URL && !process.env.MCP_SERVICE_URL.includes('localhost')) {
+              const response = await fetch(`${process.env.MCP_SERVICE_URL}/api/ci-cd/analyze`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${{ secrets.MCP_API_TOKEN }}`
+                },
+                body: JSON.stringify(analysisData)
+              });
+              
+              if (response.ok) {
+                const result = await response.json();
+                console.log('✅ MCP Analysis successful:', result.summary || 'Analysis completed');
+                
+                // 保存結果供後續步驟使用
+                fs.writeFileSync('analysis_result.json', JSON.stringify(result, null, 2));
+                core.setOutput('analysis-success', 'true');
+                core.setOutput('analysis-summary', result.summary || 'Analysis completed');
+              } else {
+                console.log('⚠️ MCP Analysis failed, continuing without AI insights');
+                core.setOutput('analysis-success', 'false');
               }
-            }' > /tmp/doc_request.json
-        
-        DOC_PATCH=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/generate-docs" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d @/tmp/doc_request.json || echo '{"error": "Doc generation failed"}')
-        
-        echo "doc-patch=${DOC_PATCH}" >> $GITHUB_OUTPUT
-
-    - name: 📋 Create Notion Release Page
-      id: notion-page
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: |
-        VERSION_TAG="${{ github.ref_name }}-v${{ github.run_number }}"
-        RELEASE_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        
-        # 使用 jq 安全地構建 Notion 請求
-        cat > /tmp/notion_template.json << 'EOF'
-        {
-          "version": "",
-          "release_date": "",
-          "repository": "",
-          "commit": "",
-          "author": "",
-          "branch": "",
-          "analysis": {},
-          "documentation": "",
-          "stats": {
-            "changed_files": 0,
-            "insertions": 0,
-            "deletions": 0
-          }
-        }
-        EOF
-        
-        # 讀取分析結果和文檔補丁
-        ANALYSIS_JSON=$(cat /tmp/analysis_result.json 2>/dev/null || echo '{}')
-        DOC_PATCH="${{ steps.doc-generation.outputs.doc-patch }}"
-        
-        jq --arg version "$VERSION_TAG" \
-           --arg date "$RELEASE_DATE" \
-           --arg repo "${{ github.repository }}" \
-           --arg commit "${{ steps.git-diff.outputs.head-sha }}" \
-           --arg author "${{ github.actor }}" \
-           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
-           --argjson analysis "$ANALYSIS_JSON" \
-           --arg docs "$DOC_PATCH" \
-           --argjson changed_files "${{ steps.git-diff.outputs.changed-files }}" \
-           --argjson insertions "${{ steps.git-diff.outputs.insertions }}" \
-           --argjson deletions "${{ steps.git-diff.outputs.deletions }}" \
-           '.version = $version |
-            .release_date = $date |
-            .repository = $repo |
-            .commit = $commit |
-            .author = $author |
-            .branch = $branch |
-            .analysis = $analysis |
-            .documentation = $docs |
-            .stats.changed_files = $changed_files |
-            .stats.insertions = $insertions |
-            .stats.deletions = $deletions' \
-           /tmp/notion_template.json > /tmp/notion_request.json
-        
-        NOTION_RESULT=$(curl -s -X POST "${MCP_SERVICE_URL}/api/ci-cd/create-release-page" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.MCP_API_TOKEN }}" \
-          -d @/tmp/notion_request.json || echo '{"error": "Notion API failed"}')
-        
-        echo "notion-result=${NOTION_RESULT}" >> $GITHUB_OUTPUT
-        
-        # 提取 Notion 頁面 URL
-        NOTION_URL=$(echo "${NOTION_RESULT}" | jq -r '.page_url // "N/A"')
-        echo "notion-url=${NOTION_URL}" >> $GITHUB_OUTPUT
-
-    - name: 📢 Slack Release Notification
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: |
-        COMMIT_MESSAGE=$(git log -1 --pretty=format:"%s")
-        VERSION_TAG="${{ github.ref_name }}-v${{ github.run_number }}"
-        COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
-        
-        # 使用 jq 安全地構建 Slack 訊息
-        cat > /tmp/slack_template.json << 'EOF'
-        {
-          "text": "",
-          "blocks": [
-            {
-              "type": "header",
-              "text": {
-                "type": "plain_text",
-                "text": "🧮 Calculator App - New Release"
-              }
-            },
-            {
-              "type": "section",
-              "fields": [
-                {
-                  "type": "mrkdwn",
-                  "text": "*Repository:*\n"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Version:*\n"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Author:*\n"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Branch:*\n"
-                }
-              ]
-            },
-            {
-              "type": "section",
-              "text": {
-                "type": "mrkdwn",
-                "text": "*Commit Message:*\n"
-              }
-            },
-            {
-              "type": "section",
-              "fields": [
-                {
-                  "type": "mrkdwn",
-                  "text": "*Files Changed:* 0"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Insertions:* +0"
-                },
-                {
-                  "type": "mrkdwn",
-                  "text": "*Deletions:* -0"
-                }
-              ]
-            },
-            {
-              "type": "actions",
-              "elements": [
-                {
-                  "type": "button",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "📋 View Release Notes"
-                  },
-                  "url": ""
-                },
-                {
-                  "type": "button",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "💻 View Commit"
-                  },
-                  "url": ""
-                }
-              ]
-            },
-            {
-              "type": "context",
-              "elements": [
-                {
-                  "type": "mrkdwn",
-                  "text": "🤖 Automated by MCP CI/CD Pipeline | 🧮 Calculator Demo Project"
-                }
-              ]
+            } else {
+              console.log('🏠 Local development - skipping MCP API call');
+              core.setOutput('analysis-success', 'mock');
             }
-          ]
-        }
-        EOF
-        
-        jq --arg text "🧮 Calculator App Release: $VERSION_TAG" \
-           --arg repo "${{ github.repository }}" \
-           --arg version "$VERSION_TAG" \
-           --arg author "${{ github.actor }}" \
-           --arg branch "${{ steps.git-diff.outputs.branch-name }}" \
-           --arg commit_msg "$COMMIT_MESSAGE" \
-           --arg files "${{ steps.git-diff.outputs.changed-files }}" \
-           --arg insertions "${{ steps.git-diff.outputs.insertions }}" \
-           --arg deletions "${{ steps.git-diff.outputs.deletions }}" \
-           --arg notion_url "${{ steps.notion-page.outputs.notion-url }}" \
-           --arg commit_url "$COMMIT_URL" \
-           '.text = $text |
-            .blocks[1].fields[0].text = "*Repository:*\n" + $repo |
-            .blocks[1].fields[1].text = "*Version:*\n" + $version |
-            .blocks[1].fields[2].text = "*Author:*\n" + $author |
-            .blocks[1].fields[3].text = "*Branch:*\n" + $branch |
-            .blocks[2].text.text = "*Commit Message:*\n" + $commit_msg |
-            .blocks[3].fields[0].text = "*Files Changed:* " + $files |
-            .blocks[3].fields[1].text = "*Insertions:* +" + $insertions |
-            .blocks[3].fields[2].text = "*Deletions:* -" + $deletions |
-            .blocks[4].elements[0].url = $notion_url |
-            .blocks[4].elements[1].url = $commit_url' \
-           /tmp/slack_template.json > /tmp/slack_payload.json
-        
-        # 發送 Slack 通知
-        curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-          -H "Content-Type: application/json" \
-          -d @/tmp/slack_payload.json
+            
+          } catch (error) {
+            console.error('❌ Analysis error:', error.message);
+            core.setOutput('analysis-success', 'false');
+          }
 
-    - name: 📝 PR Comment (for Pull Requests)
+    - name: 📝 Create Release Notes
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // 讀取分析結果
+          let analysisResult = { summary: 'No analysis available' };
+          try {
+            if (fs.existsSync('analysis_result.json')) {
+              analysisResult = JSON.parse(fs.readFileSync('analysis_result.json', 'utf8'));
+            }
+          } catch (e) {
+            console.log('No analysis result found');
+          }
+          
+          // 創建發佈說明
+          const releaseNotes = `# 🧮 Calculator Release \`${{ github.ref_name }}-${{ github.run_number }}\`
+          
+          ## 📋 Changes Summary
+          - **Files Changed**: ${{ steps.changes.outputs.changed-files }}
+          - **Lines Added**: +${{ steps.changes.outputs.insertions }}
+          - **Lines Removed**: -${{ steps.changes.outputs.deletions }}
+          - **Author**: ${{ github.actor }}
+          - **Date**: ${new Date().toISOString().split('T')[0]}
+          
+          ## 🤖 AI Analysis
+          ${analysisResult.summary || 'Analysis not available'}
+          
+          ## 🔗 Links
+          - **Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          - **Repository**: [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }})
+          
+          ---
+          *🤖 Auto-generated by MCP Calculator Pipeline*`;
+          
+          console.log('📝 Release notes generated');
+          fs.writeFileSync('RELEASE_NOTES.md', releaseNotes);
+
+    - name: 💬 Slack Notification
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.SLACK_WEBHOOK_URL
+      uses: 8398a7/action-slack@v3
+      with:
+        status: success
+        custom_payload: |
+          {
+            "text": "🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}",
+            "attachments": [{
+              "color": "good",
+              "fields": [
+                {
+                  "title": "Repository",
+                  "value": "${{ github.repository }}",
+                  "short": true
+                },
+                {
+                  "title": "Branch", 
+                  "value": "${{ github.ref_name }}",
+                  "short": true
+                },
+                {
+                  "title": "Author",
+                  "value": "${{ github.actor }}",
+                  "short": true
+                },
+                {
+                  "title": "Changes",
+                  "value": "${{ steps.changes.outputs.changed-files }} files, +${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }} lines",
+                  "short": true
+                }
+              ],
+              "actions": [{
+                "type": "button",
+                "text": "View Commit",
+                "url": "${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+              }]
+            }]
+          }
+      env:
+        SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
+
+    - name: 📋 PR Comment
       if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
       with:
         script: |
-          const analysisResult = ${{ steps.ai-analysis.outputs.analysis-result }};
+          const comment = `## 🧮 Calculator Analysis Report
           
-          const comment = `
-          ## 🧮 Calculator App - AI Code Analysis Report
+          ### 📊 Change Statistics
+          - **Files**: ${{ steps.changes.outputs.changed-files }} changed
+          - **Lines**: +${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }}
+          - **Analysis**: ${{ steps.mcp-analysis.outputs.analysis-success == 'true' && '✅ Completed' || '⚠️ Unavailable' }}
           
-          **Analysis Summary:**
-          - **Files Changed:** ${{ steps.git-diff.outputs.changed-files }}
-          - **Lines Added:** +${{ steps.git-diff.outputs.insertions }}
-          - **Lines Deleted:** -${{ steps.git-diff.outputs.deletions }}
-          
-          **AI Insights:**
-          ${analysisResult?.summary || 'Analysis completed successfully'}
-          
-          **Recommendations:**
-          ${analysisResult?.recommendations || 'Please review the changes carefully'}
+          ### 🤖 AI Insights
+          ${{ steps.mcp-analysis.outputs.analysis-summary || 'Analysis service not available in this environment' }}
           
           ---
-          *🤖 Generated by MCP AI Analysis Pipeline for Calculator Demo*
-          `;
+          *🤖 Auto-generated by MCP Calculator Pipeline*`;
           
-          github.rest.issues.createComment({
+          await github.rest.issues.createComment({
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
@@ -417,17 +234,14 @@ jobs:
     - name: 🎯 Summary
       if: always()
       run: |
-        echo "## 🧮 Calculator CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-        echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Branch:** ${{ steps.git-diff.outputs.branch-name }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Commit:** ${{ steps.git-diff.outputs.head-sha }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Changed Files:** ${{ steps.git-diff.outputs.changed-files }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Lines Changed:** +${{ steps.git-diff.outputs.insertions }}/-${{ steps.git-diff.outputs.deletions }}" >> $GITHUB_STEP_SUMMARY
-        
-        if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-          echo "- **Notion Page:** ${{ steps.notion-page.outputs.notion-url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Slack Notification:** ✅ Sent" >> $GITHUB_STEP_SUMMARY
-        fi
-        
+        echo "## 🧮 MCP Calculator Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Repository | ${{ github.repository }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Event | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Files Changed | ${{ steps.changes.outputs.changed-files }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lines Added | +${{ steps.changes.outputs.insertions }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lines Removed | -${{ steps.changes.outputs.deletions }} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "🚀 **MCP Calculator Analysis Pipeline completed successfully!**" >> $GITHUB_STEP_SUMMARY
+        echo "🚀 **Modern MCP Calculator Pipeline completed!**" >> $GITHUB_STEP_SUMMARY
