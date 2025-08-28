@@ -1,0 +1,40 @@
+pipeline {
+  agent any
+  environment { 
+    BASE_REF='origin/main'
+    AI_CLI='claude-code'
+    MAX_CHARS='12000'
+  }
+  stages {
+    stage('Checkout') { 
+      steps { 
+        checkout scm
+        sh 'git fetch --all --prune' 
+      } 
+    }
+    stage('Generate AI Docs Patch') { 
+      steps { 
+        sh 'node jenkins/scripts/ai-docs.js' 
+      } 
+    }
+    stage('Apply & Report') {
+      steps {
+        sh '''
+          if [ -s ai.patch ]; then
+            if git apply --check ai.patch; then
+              git apply ai.patch
+              git add -A
+              git -c user.email="ci@company.com" -c user.name="CI Bot" commit -m "docs: AI docstrings & changelog"
+            else
+              echo "Patch apply failed"
+              touch AI_PATCH_FAILED
+            fi
+          fi
+          git diff ${BASE_REF}...HEAD > diff.txt || true
+          npx --yes diff2html-cli -i file -s side -F diff-report.html -- diff.txt || true
+        '''
+        archiveArtifacts artifacts: 'ai.patch, AI_PATCH_FAILED, diff.txt, diff-report.html', onlyIfSuccessful: false
+      }
+    }
+  }
+}
