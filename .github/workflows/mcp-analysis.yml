@@ -313,21 +313,24 @@ jobs:
             console.error('❌ Notion 整合錯誤:', error.message);
           }
 
-    - name: 💬 Real Slack Notification
+    - name: 💬 Slack Bot Notification
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/github-script@v7
       with:
         script: |
           const https = require('https');
-          const { URL } = require('url');
           
-          console.log('💬 發送真實 Slack 通知...');
+          console.log('🤖 使用 Bot Token 發送 Slack 通知...');
           
-          const WEBHOOK_URL = 'https://hooks.slack.com/services/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';
+          const SLACK_BOT_TOKEN = '${{ secrets.SLACK_BOT_TOKEN }}';
+          const SLACK_CHANNEL = 'C09BMBKK6DN'; // #all-ags-mpc
           const notionPageUrl = '${{ steps.notion-creation.outputs.notion-page-url || "https://www.notion.so/MCP-Calculator-Release-Notes-26116b056deb811586bbc32445755f09" }}';
           
           const slackMessage = {
+            channel: SLACK_CHANNEL,
             text: "🎉 MCP Calculator GitHub Actions 自動化成功！",
+            username: "MCP Calculator Bot",
+            icon_emoji: ":robot_face:",
             attachments: [
               {
                 color: "good",
@@ -365,8 +368,13 @@ jobs:
                     short: true
                   },
                   {
+                    title: "Notion Page",
+                    value: `<${notionPageUrl}|📄 查看發佈筆記>`,
+                    short: false
+                  },
+                  {
                     title: "Status",
-                    value: "✅ GitHub → Notion → Slack 完整整合成功",
+                    value: "✅ GitHub → Notion → Slack 完整整合成功 (使用 Bot Token)",
                     short: false
                   }
                 ],
@@ -377,41 +385,61 @@ jobs:
             ]
           };
           
-          async function sendSlackNotification(webhookUrl, message) {
-            const url = new URL(webhookUrl);
+          async function sendSlackBotMessage(token, message) {
             const payload = JSON.stringify(message);
             
+            const options = {
+              hostname: 'slack.com',
+              port: 443,
+              path: '/api/chat.postMessage',
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+              }
+            };
+            
             return new Promise((resolve) => {
-              const req = https.request({
-                hostname: url.hostname,
-                port: url.port || 443,
-                path: url.pathname,
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Content-Length': Buffer.byteLength(payload)
-                }
-              }, (res) => {
+              const req = https.request(options, (res) => {
                 let data = '';
                 res.on('data', chunk => data += chunk);
-                res.on('end', () => resolve({
-                  status: res.statusCode,
-                  data: data
-                }));
+                res.on('end', () => {
+                  try {
+                    const result = JSON.parse(data);
+                    resolve({
+                      status: res.statusCode,
+                      success: result.ok,
+                      data: result,
+                      error: result.error
+                    });
+                  } catch (e) {
+                    resolve({
+                      status: res.statusCode,
+                      success: false,
+                      error: 'Invalid JSON response'
+                    });
+                  }
+                });
               });
-              req.on('error', (err) => resolve({ status: 500, error: err.message }));
+              req.on('error', (err) => resolve({ success: false, error: err.message }));
               req.write(payload);
               req.end();
             });
           }
           
-          const result = await sendSlackNotification(WEBHOOK_URL, slackMessage);
+          const result = await sendSlackBotMessage(SLACK_BOT_TOKEN, slackMessage);
           
-          if (result.status === 200) {
-            console.log('🎉 Slack 通知發送成功！');
-            console.log('📱 請查看 Slack channel 確認訊息');
+          if (result.success) {
+            console.log('🎉 Slack Bot 通知發送成功！');
+            console.log(`📱 訊息已發送到 #all-ags-mpc channel`);
+            console.log(`⏰ Message timestamp: ${result.data.ts}`);
+            core.setOutput('slack-success', 'true');
+            core.setOutput('slack-channel', 'all-ags-mpc');
           } else {
-            console.error('❌ Slack 通知失敗:', result.status, result.error || result.data);
+            console.error('❌ Slack Bot 通知失敗:', result.error);
+            console.error('📄 詳細:', JSON.stringify(result.data, null, 2));
+            core.setOutput('slack-success', 'false');
           }
 
     - name: 📋 PR Comment
