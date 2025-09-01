@@ -1,0 +1,116 @@
+name: 🧪 Test Slack Bot Only
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-slack:
+    name: 🤖 Test Slack Bot
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📦 Checkout
+      uses: actions/checkout@v4
+    
+    - name: 🧪 Simple Slack Test
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const https = require('https');
+          
+          console.log('🤖 測試 Slack Bot Token...');
+          
+          const SLACK_BOT_TOKEN = '${{ secrets.SLACK_BOT_TOKEN }}';
+          const SLACK_CHANNEL = 'C09BMBKK6DN';
+          
+          console.log('Token 存在:', SLACK_BOT_TOKEN ? '✅ 是' : '❌ 否');
+          console.log('Token 前綴:', SLACK_BOT_TOKEN ? SLACK_BOT_TOKEN.substring(0, 10) + '...' : 'N/A');
+          
+          if (!SLACK_BOT_TOKEN) {
+            console.error('❌ SLACK_BOT_TOKEN secret 未設置！');
+            console.log('💡 請在 GitHub Repository Settings → Secrets → Actions 中設置');
+            return;
+          }
+          
+          const testMessage = {
+            channel: SLACK_CHANNEL,
+            text: '🧪 GitHub Actions Slack Bot 測試成功！',
+            username: 'GitHub Actions Bot',
+            icon_emoji: ':github:',
+            attachments: [{
+              color: 'good',
+              title: '✅ 測試結果',
+              text: `Repository: ${{ github.repository }}\nRun: #${{ github.run_number }}\nTime: ${new Date().toISOString()}`,
+              footer: 'GitHub Actions Test'
+            }]
+          };
+          
+          async function sendSlackMessage(token, message) {
+            const payload = JSON.stringify(message);
+            
+            const options = {
+              hostname: 'slack.com',
+              port: 443,
+              path: '/api/chat.postMessage',
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(payload)
+              }
+            };
+            
+            return new Promise((resolve) => {
+              const req = https.request(options, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => {
+                  try {
+                    const result = JSON.parse(data);
+                    resolve({
+                      status: res.statusCode,
+                      success: result.ok,
+                      data: result,
+                      error: result.error
+                    });
+                  } catch (e) {
+                    resolve({
+                      status: res.statusCode,
+                      success: false,
+                      error: 'Invalid JSON response'
+                    });
+                  }
+                });
+              });
+              req.on('error', (err) => resolve({ success: false, error: err.message }));
+              req.write(payload);
+              req.end();
+            });
+          }
+          
+          console.log('📤 發送測試訊息...');
+          
+          const result = await sendSlackMessage(SLACK_BOT_TOKEN, testMessage);
+          
+          console.log('📊 結果:');
+          console.log(`HTTP 狀態: ${result.status}`);
+          console.log(`Slack API 成功: ${result.success}`);
+          
+          if (result.success) {
+            console.log('🎉 GitHub Actions → Slack 整合成功！');
+            console.log(`📱 訊息已發送到 #all-ags-mpc`);
+            console.log(`⏰ 時間戳: ${result.data.ts}`);
+          } else {
+            console.error('❌ 發送失敗:', result.error);
+            console.error('詳細:', JSON.stringify(result.data, null, 2));
+            
+            if (result.error === 'invalid_auth') {
+              console.log('💡 Token 無效，請檢查 GitHub Secret');
+            } else if (result.error === 'not_in_channel') {
+              console.log('💡 Bot 未被邀請到 channel');
+            }
+            
+            throw new Error(`Slack 通知失敗: ${result.error}`);
+          }
