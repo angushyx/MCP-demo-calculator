@@ -14,8 +14,7 @@ class CurrencyConverter {
             { code: 'TWD', name: '台幣', symbol: 'NT$' },
             { code: 'HKD', name: '港幣', symbol: 'HK$' },
             { code: 'SGD', name: '新加坡元', symbol: 'S$' },
-            { code: 'AUD', name: '澳幣', symbol: 'A$' },
-            { code: 'CAD', name: '加幣', symbol: 'C$' }
+            { code: 'AUD', name: '澳幣', symbol: 'A$' }
         ];
         this.initializeRates();
     }
