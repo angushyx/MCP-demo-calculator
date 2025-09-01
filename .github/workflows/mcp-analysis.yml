@@ -323,7 +323,7 @@ jobs:
           
           console.log('💬 發送真實 Slack 通知...');
           
-          const WEBHOOK_URL = 'https://hooks.slack.com/services/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';
+          const WEBHOOK_URL = 'https://hooks.slack.com/services/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';
           const notionPageUrl = '${{ steps.notion-creation.outputs.notion-page-url || "https://www.notion.so/MCP-Calculator-Release-Notes-26116b056deb811586bbc32445755f09" }}';
           
           const slackMessage = {
