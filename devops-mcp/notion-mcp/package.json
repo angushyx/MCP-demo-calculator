@@ -1,0 +1,18 @@
+{
+  "name": "notion-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Notion MCP Server for DevOps automation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@notionhq/client": "^2.2.3"
+  },
+  "keywords": ["mcp", "notion", "devops", "automation"],
+  "author": "Your Name",
+  "license": "MIT"
+}

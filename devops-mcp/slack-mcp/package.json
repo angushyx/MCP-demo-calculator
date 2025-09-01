@@ -1,0 +1,18 @@
+{
+  "name": "slack-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Slack MCP Server for DevOps automation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@slack/web-api": "^7.0.0"
+  },
+  "keywords": ["mcp", "slack", "devops", "automation"],
+  "author": "Your Name",
+  "license": "MIT"
+}
