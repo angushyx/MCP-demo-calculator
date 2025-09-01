@@ -171,9 +171,15 @@ jobs:
       with:
         script: |
           const https = require('https');
-          const NOTION_API_KEY = 'ntn_f60904852272g19VvtkBtnTXg5coABK4QN4lnCmn9eS3Bk';
+          const NOTION_API_KEY = '${{ secrets.NOTION_API_KEY }}';
           
           console.log('🔗 Creating real Notion page via GitHub Actions...');
+          
+          if (!NOTION_API_KEY) {
+            console.error('❌ NOTION_API_KEY secret 未設置！');
+            console.log('💡 請在 GitHub Repository Settings → Secrets → Actions 中設置');
+            return;
+          }
           
           // 搜索 parent 頁面
           async function findParentPage() {
