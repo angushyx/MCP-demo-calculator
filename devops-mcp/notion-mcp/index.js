@@ -2,9 +2,9 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Client as NotionClient } from '@notionhq/client';
-// 直接使用提供的 API key
-const NOTION_API_KEY = 'ntn_f60904852272g19VvtkBtnTXg5coABK4QN4lnCmn9eS3Bk';
-const MOCK_MODE = false;
+// 使用環境變數中的 API key
+const NOTION_API_KEY = process.env.NOTION_API_KEY;
+const MOCK_MODE = !NOTION_API_KEY;
 let notion = null;
 if (!MOCK_MODE) {
     notion = new NotionClient({

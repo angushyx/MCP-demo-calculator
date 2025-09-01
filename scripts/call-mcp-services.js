@@ -21,7 +21,11 @@ async function callNotionMCP() {
     
     const notionMCP = spawn('node', ['devops-mcp/notion-mcp/index.js'], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        cwd: process.cwd()
+        cwd: process.cwd(),
+        env: {
+            ...process.env,
+            NOTION_API_KEY: process.env.NOTION_API_KEY
+        }
     });
     
     // 準備 MCP 請求
@@ -30,36 +34,20 @@ async function callNotionMCP() {
         id: 1,
         method: "tools/call",
         params: {
-            name: "createPage",
+            name: "Notion:createPage",
             arguments: {
-                parent_title: "MCP-DEMO",
                 title: `🚀 GitHub Actions Release - Run #${runNumber}`,
-                content: [
-                    {
-                        type: "heading_1",
-                        text: "📋 自動化發佈筆記 (真正的 MCP!)"
-                    },
-                    {
-                        type: "paragraph",
-                        text: `🔄 此頁面由真正的 MCP 服務自動創建\n📊 Repository: ${repository}\n👤 Author: ${author}\n📅 Date: ${new Date().toISOString()}`
-                    },
-                    {
-                        type: "heading_2",
-                        text: "📈 變更統計"
-                    },
-                    {
-                        type: "bulleted_list_item",
-                        text: `📁 Files: ${changedFiles} changed`
-                    },
-                    {
-                        type: "bulleted_list_item",
-                        text: `✅ Lines: +${insertions}/-${deletions}`
-                    },
-                    {
-                        type: "bulleted_list_item",
-                        text: "🤖 MCP Integration: ✅ 使用真正的 MCP 協議！"
-                    }
-                ]
+                content: `# 📋 自動化發佈筆記 (真正的 MCP!)
+
+🔄 此頁面由真正的 MCP 服務自動創建
+📊 Repository: ${repository}
+👤 Author: ${author}
+📅 Date: ${new Date().toISOString()}
+
+## 📈 變更統計
+- 📁 Files: ${changedFiles} changed
+- ✅ Lines: +${insertions}/-${deletions}  
+- 🤖 MCP Integration: ✅ 使用真正的 MCP 協議！`
             }
         }
     };
@@ -116,7 +104,7 @@ async function callSlackMCP(notionUrl) {
         id: 2,
         method: "tools/call",
         params: {
-            name: "postMessage",
+            name: "Slack:postMessage",
             arguments: {
                 channel: "#all-ags-mcp",
                 text: "🎉 MCP Calculator GitHub Actions 自動化成功！",
