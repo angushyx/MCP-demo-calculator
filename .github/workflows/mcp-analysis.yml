@@ -165,22 +165,28 @@ jobs:
           fs.writeFileSync('RELEASE_NOTES.md', releaseNotes);
 
     - name: 💬 Slack Notification
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.SLACK_WEBHOOK_URL
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       run: |
-        curl -X POST "${{ secrets.SLACK_WEBHOOK_URL }}" \
-          -H "Content-Type: application/json" \
-          -d "{
-            \"text\": \"🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}\",
-            \"attachments\": [{
-              \"color\": \"good\",
-              \"fields\": [
-                {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
-                {\"title\": \"Author\", \"value\": \"${{ github.actor }}\", \"short\": true},
-                {\"title\": \"Files\", \"value\": \"${{ steps.changes.outputs.changed-files }} files\", \"short\": true},
-                {\"title\": \"Changes\", \"value\": \"+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }}\", \"short\": true}
-              ]
-            }]
-          }" || echo "Slack notification failed"
+        if [ -n "$SLACK_WEBHOOK_URL" ]; then
+          curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"text\": \"🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}\",
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"fields\": [
+                  {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
+                  {\"title\": \"Author\", \"value\": \"${{ github.actor }}\", \"short\": true},
+                  {\"title\": \"Files\", \"value\": \"${{ steps.changes.outputs.changed-files }} files\", \"short\": true},
+                  {\"title\": \"Changes\", \"value\": \"+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }}\", \"short\": true}
+                ]
+              }]
+            }" && echo "✅ Slack notification sent" || echo "⚠️ Slack notification failed"
+        else
+          echo "⚠️ Slack webhook URL not configured"
+        fi
 
     - name: 📋 PR Comment
       if: github.event_name == 'pull_request'
