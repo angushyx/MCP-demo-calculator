@@ -313,23 +313,22 @@ jobs:
             console.error('❌ Notion 整合錯誤:', error.message);
           }
 
-    - name: 💬 Slack Bot Notification
+    - name: 💬 Slack Webhook Notification
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: actions/github-script@v7
       with:
         script: |
           const https = require('https');
+          const { URL } = require('url');
           
-          console.log('🤖 使用 Bot Token 發送 Slack 通知...');
+          console.log('💬 使用永久 Webhook 發送 Slack 通知...');
           
-          const SLACK_BOT_TOKEN = '${{ secrets.SLACK_BOT_TOKEN }}';
-          const SLACK_CHANNEL = 'C09BMBKK6DN'; // #all-ags-mpc
+          const WEBHOOK_URL = 'https://hooks.slack.com/services/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';
           const notionPageUrl = '${{ steps.notion-creation.outputs.notion-page-url || "https://www.notion.so/MCP-Calculator-Release-Notes-26116b056deb811586bbc32445755f09" }}';
           
           const slackMessage = {
-            channel: SLACK_CHANNEL,
             text: "🎉 MCP Calculator GitHub Actions 自動化成功！",
-            username: "MCP Calculator Bot",
+            username: "MCP Calculator Bot", 
             icon_emoji: ":robot_face:",
             attachments: [
               {
@@ -343,7 +342,7 @@ jobs:
                     short: true
                   },
                   {
-                    title: "Author", 
+                    title: "Author",
                     value: "${{ github.actor }}",
                     short: true
                   },
@@ -353,8 +352,8 @@ jobs:
                     short: true
                   },
                   {
-                    title: "Changes",
-                    value: "+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }} lines", 
+                    title: "Changes", 
+                    value: "+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }} lines",
                     short: true
                   },
                   {
@@ -373,8 +372,8 @@ jobs:
                     short: false
                   },
                   {
-                    title: "Status",
-                    value: "✅ GitHub → Notion → Slack 完整整合成功 (使用 Bot Token)",
+                    title: "Status", 
+                    value: "✅ GitHub → Notion → Slack 完整整合成功 (使用永久 Webhook)",
                     short: false
                   }
                 ],
@@ -385,16 +384,16 @@ jobs:
             ]
           };
           
-          async function sendSlackBotMessage(token, message) {
+          async function sendSlackWebhook(webhookUrl, message) {
+            const url = new URL(webhookUrl);
             const payload = JSON.stringify(message);
             
             const options = {
-              hostname: 'slack.com',
+              hostname: url.hostname,
               port: 443,
-              path: '/api/chat.postMessage',
+              path: url.pathname,
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(payload)
               }
@@ -405,21 +404,11 @@ jobs:
                 let data = '';
                 res.on('data', chunk => data += chunk);
                 res.on('end', () => {
-                  try {
-                    const result = JSON.parse(data);
-                    resolve({
-                      status: res.statusCode,
-                      success: result.ok,
-                      data: result,
-                      error: result.error
-                    });
-                  } catch (e) {
-                    resolve({
-                      status: res.statusCode,
-                      success: false,
-                      error: 'Invalid JSON response'
-                    });
-                  }
+                  resolve({
+                    status: res.statusCode,
+                    success: res.statusCode === 200 && data === 'ok',
+                    response: data
+                  });
                 });
               });
               req.on('error', (err) => resolve({ success: false, error: err.message }));
@@ -428,17 +417,20 @@ jobs:
             });
           }
           
-          const result = await sendSlackBotMessage(SLACK_BOT_TOKEN, slackMessage);
+          console.log('🔗 發送到:', WEBHOOK_URL.substring(0, 50) + '...');
+          
+          const result = await sendSlackWebhook(WEBHOOK_URL, slackMessage);
           
           if (result.success) {
-            console.log('🎉 Slack Bot 通知發送成功！');
-            console.log(`📱 訊息已發送到 #all-ags-mpc channel`);
-            console.log(`⏰ Message timestamp: ${result.data.ts}`);
+            console.log('🎉 Slack Webhook 通知發送成功！');
+            console.log(`📱 訊息已發送到 #all-ags-mcp channel`);
+            console.log(`📊 狀態: ${result.status} - ${result.response}`);
             core.setOutput('slack-success', 'true');
-            core.setOutput('slack-channel', 'all-ags-mpc');
+            core.setOutput('slack-method', 'webhook');
           } else {
-            console.error('❌ Slack Bot 通知失敗:', result.error);
-            console.error('📄 詳細:', JSON.stringify(result.data, null, 2));
+            console.error('❌ Slack Webhook 通知失敗');
+            console.error(`📊 狀態: ${result.status}`);
+            console.error(`📄 回應: ${result.response || result.error}`);
             core.setOutput('slack-success', 'false');
           }
 
