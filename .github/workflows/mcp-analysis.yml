@@ -312,29 +312,106 @@ jobs:
             console.error('❌ Notion 整合錯誤:', error.message);
           }
 
-    - name: 💬 Slack Notification
+    - name: 💬 Real Slack Notification
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      env:
-        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      run: |
-        if [ -n "$SLACK_WEBHOOK_URL" ]; then
-          curl -X POST "$SLACK_WEBHOOK_URL" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"text\": \"🧮 Calculator Release: ${{ github.ref_name }}-${{ github.run_number }}\",
-              \"attachments\": [{
-                \"color\": \"good\",
-                \"fields\": [
-                  {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
-                  {\"title\": \"Author\", \"value\": \"${{ github.actor }}\", \"short\": true},
-                  {\"title\": \"Files\", \"value\": \"${{ steps.changes.outputs.changed-files }} files\", \"short\": true},
-                  {\"title\": \"Changes\", \"value\": \"+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }}\", \"short\": true}
-                ]
-              }]
-            }" && echo "✅ Slack notification sent" || echo "⚠️ Slack notification failed"
-        else
-          echo "⚠️ Slack webhook URL not configured"
-        fi
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const https = require('https');
+          const { URL } = require('url');
+          
+          console.log('💬 發送真實 Slack 通知...');
+          
+          const WEBHOOK_URL = 'https://hooks.slack.com/services/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';
+          const notionPageUrl = '${{ steps.real-notion-page-creation.outputs.notion-page-url || "https://www.notion.so/MCP-Calculator-Release-Notes-26116b056deb811586bbc32445755f09" }}';
+          
+          const slackMessage = {
+            text: "🎉 MCP Calculator GitHub Actions 自動化成功！",
+            attachments: [
+              {
+                color: "good",
+                title: "📋 自動化發佈筆記",
+                title_link: notionPageUrl,
+                fields: [
+                  {
+                    title: "Repository",
+                    value: "${{ github.repository }}",
+                    short: true
+                  },
+                  {
+                    title: "Author", 
+                    value: "${{ github.actor }}",
+                    short: true
+                  },
+                  {
+                    title: "Files Changed",
+                    value: "${{ steps.changes.outputs.changed-files }} files",
+                    short: true
+                  },
+                  {
+                    title: "Changes",
+                    value: "+${{ steps.changes.outputs.insertions }}/-${{ steps.changes.outputs.deletions }} lines", 
+                    short: true
+                  },
+                  {
+                    title: "Branch",
+                    value: "${{ github.ref_name }}",
+                    short: true
+                  },
+                  {
+                    title: "Run Number",
+                    value: "#${{ github.run_number }}",
+                    short: true
+                  },
+                  {
+                    title: "Status",
+                    value: "✅ GitHub → Notion → Slack 完整整合成功",
+                    short: false
+                  }
+                ],
+                footer: "MCP Calculator Pipeline",
+                footer_icon: "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+                ts: Math.floor(Date.now() / 1000)
+              }
+            ]
+          };
+          
+          async function sendSlackNotification(webhookUrl, message) {
+            const url = new URL(webhookUrl);
+            const payload = JSON.stringify(message);
+            
+            return new Promise((resolve) => {
+              const req = https.request({
+                hostname: url.hostname,
+                port: url.port || 443,
+                path: url.pathname,
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(payload)
+                }
+              }, (res) => {
+                let data = '';
+                res.on('data', chunk => data += chunk);
+                res.on('end', () => resolve({
+                  status: res.statusCode,
+                  data: data
+                }));
+              });
+              req.on('error', (err) => resolve({ status: 500, error: err.message }));
+              req.write(payload);
+              req.end();
+            });
+          }
+          
+          const result = await sendSlackNotification(WEBHOOK_URL, slackMessage);
+          
+          if (result.status === 200) {
+            console.log('🎉 Slack 通知發送成功！');
+            console.log('📱 請查看 Slack channel 確認訊息');
+          } else {
+            console.error('❌ Slack 通知失敗:', result.status, result.error || result.data);
+          }
 
     - name: 📋 PR Comment
       if: github.event_name == 'pull_request'
