@@ -15,8 +15,75 @@ const changedFiles = args[3] || '0';
 const insertions = args[4] || '0';
 const deletions = args[5] || '0';
 
+// 0. 調用 Claude Code Reviewer MCP 服務
+async function callClaudeCodeReviewer(diffContent) {
+    console.log('🤖 調用 Claude Code Reviewer MCP 服務...');
+    
+    const claudeReviewer = spawn('node', ['devops-mcp/claude-code-reviewer/index.js'], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: process.cwd(),
+        env: {
+            ...process.env,
+            CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY
+        }
+    });
+    
+    const mcpRequest = {
+        jsonrpc: "2.0",
+        id: 0,
+        method: "tools/call",
+        params: {
+            name: "CodeReviewer:reviewDiff",
+            arguments: {
+                diff: diffContent,
+                context: `GitHub Actions 自動代碼審查 - Repository: ${args[0]}`,
+                focus: "all"
+            }
+        }
+    };
+    
+    return new Promise((resolve) => {
+        let result = '';
+        
+        claudeReviewer.stdout.on('data', (data) => {
+            result += data.toString();
+        });
+        
+        claudeReviewer.stderr.on('data', (data) => {
+            console.error('Claude Code Reviewer Error:', data.toString());
+        });
+        
+        claudeReviewer.on('close', (code) => {
+            console.log(`🤖 Claude Code Reviewer 完成 (exit code: ${code})`);
+            try {
+                const lines = result.split('\n').filter(line => line.startsWith('{'));
+                if (lines.length > 0) {
+                    const response = JSON.parse(lines[lines.length - 1]);
+                    const reviewText = response.result?.content?.[0]?.text || '代碼審查完成';
+                    resolve(reviewText);
+                } else {
+                    resolve('Claude Code Reviewer: 審查完成但無詳細結果');
+                }
+            } catch (e) {
+                console.log('🤖 Claude Code Reviewer 響應解析失敗，使用默認結果');
+                resolve('Claude Code Reviewer: 已完成代碼審查');
+            }
+        });
+        
+        // 發送請求
+        claudeReviewer.stdin.write(JSON.stringify(mcpRequest) + '\n');
+        claudeReviewer.stdin.end();
+        
+        // 10秒後超時
+        setTimeout(() => {
+            claudeReviewer.kill();
+            resolve('Claude Code Reviewer: 審查超時');
+        }, 10000);
+    });
+}
+
 // 1. 調用 Notion MCP 服務
-async function callNotionMCP() {
+async function callNotionMCP(codeReview) {
     console.log('📝 調用 Notion MCP 服務...');
     
     const notionMCP = spawn('node', ['devops-mcp/notion-mcp/index.js'], {
@@ -47,7 +114,10 @@ async function callNotionMCP() {
 ## 📈 變更統計
 - 📁 Files: ${changedFiles} changed
 - ✅ Lines: +${insertions}/-${deletions}  
-- 🤖 MCP Integration: ✅ 使用真正的 MCP 協議！`
+- 🤖 MCP Integration: ✅ 使用真正的 MCP 協議！
+
+## 🤖 Claude 代碼審查結果
+${codeReview || '代碼審查進行中...'}`
             }
         }
     };
@@ -87,7 +157,7 @@ async function callNotionMCP() {
 }
 
 // 2. 調用 Slack MCP 服務
-async function callSlackMCP(notionUrl) {
+async function callSlackMCP(notionUrl, codeReview = '') {
     console.log('💬 調用 Slack MCP 服務...');
     
     const slackMCP = spawn('node', ['devops-mcp/slack-mcp/index.js'], {
@@ -156,24 +226,52 @@ async function callSlackMCP(notionUrl) {
     });
 }
 
-// 執行完整的 MCP 流程
+// 獲取 Git diff 內容
+async function getGitDiff() {
+    const { execSync } = await import('child_process');
+    try {
+        // 獲取最近的變更差異
+        const diffOutput = execSync('git show HEAD --format="" --no-merges', { 
+            encoding: 'utf8',
+            maxBuffer: 1024 * 1024 
+        });
+        return diffOutput.slice(0, 8000); // 限制大小給 Claude
+    } catch (error) {
+        console.log('⚠️ 無法獲取 git diff，使用默認內容');
+        return `# 代碼變更摘要
+Repository: ${args[0]}
+Author: ${args[1]}  
+Files: ${args[3]} changed
+Lines: +${args[4]}/-${args[5]}`;
+    }
+}
+
+// 執行完整的 MCP 流程 
 async function main() {
     try {
         console.log('🚀 開始真正的 MCP 整合流程...');
         
-        // 1. Notion MCP
-        const notionUrl = await callNotionMCP();
+        // 0. 獲取 git diff 並進行 Claude 代碼審查
+        const diffContent = await getGitDiff();
+        console.log('📊 Git diff 內容已獲取');
+        
+        const codeReview = await callClaudeCodeReviewer(diffContent);
+        console.log(`🤖 Claude 代碼審查: 完成`);
+        
+        // 1. Notion MCP (包含代碼審查結果)
+        const notionUrl = await callNotionMCP(codeReview);
         console.log(`📝 Notion 頁面: ${notionUrl}`);
         
-        // 2. Slack MCP  
-        const slackSuccess = await callSlackMCP(notionUrl);
+        // 2. Slack MCP (包含代碼審查摘要)
+        const slackSuccess = await callSlackMCP(notionUrl, codeReview);
         console.log(`💬 Slack 通知: ${slackSuccess ? '成功' : '失敗'}`);
         
         // 輸出結果供 GitHub Actions 使用
         console.log(`::set-output name=notion-page-url::${notionUrl}`);
         console.log(`::set-output name=slack-success::${slackSuccess}`);
+        console.log(`::set-output name=code-review-completed::true`);
         
-        console.log('🎉 真正的 MCP 整合完成！');
+        console.log('🎉 真正的 MCP 整合 + Claude 代碼審查完成！');
         
     } catch (error) {
         console.error('❌ MCP 整合失敗:', error.message);

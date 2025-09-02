@@ -173,6 +173,7 @@ jobs:
         # 安裝依賴
         cd devops-mcp/notion-mcp && npm install && cd ../..
         cd devops-mcp/slack-mcp && npm install && cd ../..
+        cd devops-mcp/claude-code-reviewer && npm install && cd ../..
         
         # 確保腳本可執行
         chmod +x scripts/call-mcp-services.js
@@ -189,6 +190,8 @@ jobs:
       env:
         SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+        CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
     - name: 📋 PR Comment
       if: github.event_name == 'pull_request'
