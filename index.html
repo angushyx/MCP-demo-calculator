@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Demo Calculator - Complete Integration ✅</title>
+    <title>🚀 MCP Demo Calculator v2.0 - Advanced Scientific Edition</title>
     <link rel="stylesheet" href="src/styles.css">
 </head>
 <body>
     <div class="calculator-container">
         <div class="calculator">
             <div class="header">
-                <h1>🧮 MCP Calculator</h1>
-                <p>🤖 完整 MCP 整合測試 - Bot Token 就緒！</p>
+                <h1>🚀 MCP Calculator v2.0</h1>
+                <p>🧮 新增科學計算功能 | 🤖 Claude Code Reviewer 整合 | 📊 完整 MCP 自動化</p>
+                <div class="features-badge">
+                    ✨ 新功能: 三角函數 | 階乘計算 | 複雜表達式 | 記憶體儲存 | AI 代碼審查
+                </div>
             </div>
             
             <div class="display">
@@ -45,13 +48,27 @@
             </div>
             
             <div class="advanced-buttons">
-                <button class="btn btn-advanced" onclick="appendToDisplay('sqrt(')">√</button>
-                <button class="btn btn-advanced" onclick="appendToDisplay('pow(')">x²</button>
-                <button class="btn btn-advanced" onclick="appendToDisplay('sin(')">sin</button>
-                <button class="btn btn-advanced" onclick="appendToDisplay('cos(')">cos</button>
-                <button class="btn btn-advanced" onclick="appendToDisplay('(')">(</button>
-                <button class="btn btn-advanced" onclick="appendToDisplay(')')">)</button>
-                <button class="btn btn-history" onclick="showCalculationHistory()" title="查看計算歷史">📊</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('sqrt')">√</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('power')">x^y</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('sin')">sin</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('cos')">cos</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('tan')">tan</button>
+                <button class="btn btn-advanced" onclick="calculateScientific('factorial')">n!</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('3.14159')">π</button>
+                <button class="btn btn-advanced" onclick="appendToDisplay('2.71828')">e</button>
+            </div>
+            
+            <div class="scientific-panel" style="margin-top: 10px;">
+                <button class="btn btn-memory" onclick="window.scientificCalculator.memStore(parseFloat(document.getElementById('display').value))">MS</button>
+                <button class="btn btn-memory" onclick="document.getElementById('display').value = window.scientificCalculator.memRecall()">MR</button>
+                <button class="btn btn-expression" onclick="evaluateComplexExpression()">Eval</button>
+                <button class="btn btn-history" onclick="showCalculationHistory()">📊</button>
+            </div>
+            
+            <!-- 表達式計算功能 -->
+            <div class="expression-input" style="margin-top: 15px;">
+                <input type="text" id="expression-input" placeholder="輸入複雜表達式 (如: sin(30) + π * 2)" style="width: 70%; padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
+                <button class="btn btn-expression" onclick="evaluateComplexExpression()" style="width: 25%;">計算</button>
             </div>
             
             <!-- 貨幣轉換器 -->
@@ -106,7 +123,21 @@
         </div>
     </div>
     
+    <script src="src/scientific-calculator.js"></script>
+    <script src="src/advanced-math-utils.js"></script>
     <script src="src/calculator.js"></script>
     <script src="src/currency.js"></script>
+    
+    <script>
+        // 版本資訊和功能提示
+        console.log('🚀 MCP Calculator v2.0 - Advanced Scientific Edition');
+        console.log('✨ 新功能包括:');
+        console.log('  • 科學計算 (sin, cos, tan, √, x^y, n!)');
+        console.log('  • 複雜表達式求值 (支援 π, e)');
+        console.log('  • 記憶體儲存功能 (MS/MR)');
+        console.log('  • 🤖 Claude AI 代碼審查整合');
+        console.log('  • 📊 詳細計算歷史記錄');
+        console.log('💡 提示: 在表達式輸入框嘗試 "sin(30) + π * 2"');
+    </script>
 </body>
 </html>

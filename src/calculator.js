@@ -5,6 +5,11 @@ class Calculator {
         this.shouldResetDisplay = false;
         this.lastOperation = null;
         this.history = [];
+        
+        // 新增科學計算器功能
+        this.scientificMode = false;
+        this.scientific = new ScientificCalculator();
+        this.angleMode = 'degree'; // degree 或 radian
     }
 
     updateDisplay() {
@@ -321,3 +326,136 @@ function showCalculationHistory() {
 }
 
 console.log("✨ 歷史查看功能已載入 - 點擊 📊 按鈕查看計算記錄");
+
+// 🧮 科學計算器擴展功能 - 故意包含一些可以改進的地方
+window.scientificCalculator = {
+    memory: 0,
+    angleMode: 'degree',
+    
+    // 科學運算方法 - 有錯誤處理問題
+    power: function(base, exp) {
+        // 沒有參數驗證
+        return Math.pow(base, exp);
+    },
+    
+    sqrt: function(n) {
+        // 沒有檢查負數
+        return Math.sqrt(n);
+    },
+    
+    factorial: function(n) {
+        if (n == 0) return 1; // 使用 == 而不是 ===
+        // 遞歸可能導致堆疊溢出
+        return n * this.factorial(n - 1);
+    },
+    
+    // 三角函數 - 角度轉換邏輯
+    sin: function(angle) {
+        var radian = angle; // 使用 var
+        if (this.angleMode == 'degree') {
+            radian = angle * Math.PI / 180;
+        }
+        return Math.sin(radian);
+    },
+    
+    // 危險的表達式求值
+    evaluateExpression: function(expr) {
+        try {
+            // 使用 eval - 安全風險！
+            return eval(expr.replace(/π/g, 'Math.PI').replace(/e/g, 'Math.E'));
+        } catch (e) {
+            return NaN;
+        }
+    },
+    
+    // 記憶體功能 - 簡單實現
+    memStore: function(value) {
+        this.memory = value;
+        console.log('Stored: ' + value); // 字串連接而非模板字符串
+    },
+    
+    memRecall: function() {
+        return this.memory;
+    }
+};
+
+// 全域函數 - 可能造成命名空間污染
+function calculateScientific(operation) {
+    const input = parseFloat(document.getElementById('display').value);
+    let result;
+    
+    // 大量的 if-else - 可以用 switch 或策略模式
+    if (operation == 'sin') {
+        result = window.scientificCalculator.sin(input);
+    } else if (operation == 'cos') {
+        result = Math.cos(input * Math.PI / 180); // 重複的角度轉換邏輯
+    } else if (operation == 'tan') {
+        result = Math.tan(input * Math.PI / 180);
+    } else if (operation == 'sqrt') {
+        result = window.scientificCalculator.sqrt(input);
+    } else if (operation == 'factorial') {
+        result = window.scientificCalculator.factorial(input);
+    } else if (operation == 'power') {
+        const exp = prompt('輸入指數:'); // 使用 prompt - 不好的 UX
+        result = window.scientificCalculator.power(input, parseFloat(exp));
+    }
+    
+    // 沒有檢查結果有效性
+    document.getElementById('display').value = result;
+    
+    // 簡單的歷史記錄
+    calc.addToHistory(`${operation}(${input}) = ${result}`);
+}
+
+// 複雜表達式求值 - 使用危險的 eval 方法
+function evaluateComplexExpression() {
+    const expressionInput = document.getElementById('expression-input');
+    let expression = expressionInput.value.trim();
+    
+    if (!expression) {
+        // 從主顯示器讀取
+        expression = document.getElementById('display').value;
+    }
+    
+    try {
+        // 預處理表達式 - 替換常數和函數
+        let processedExpression = expression
+            .replace(/π/g, 'Math.PI')
+            .replace(/pi/g, 'Math.PI')  
+            .replace(/e/g, 'Math.E')
+            .replace(/sin\(/g, 'Math.sin(')
+            .replace(/cos\(/g, 'Math.cos(')
+            .replace(/tan\(/g, 'Math.tan(')
+            .replace(/sqrt\(/g, 'Math.sqrt(')
+            .replace(/log\(/g, 'Math.log10(')
+            .replace(/ln\(/g, 'Math.log(');
+        
+        console.log('Original expression:', expression);
+        console.log('Processed expression:', processedExpression);
+        
+        // ⚠️ 安全風險：使用 eval！Claude 應該會指出這個問題
+        const result = eval(processedExpression);
+        
+        if (!isFinite(result)) {
+            throw new Error('結果無效');
+        }
+        
+        // 顯示結果
+        document.getElementById('display').value = result;
+        
+        // 添加到歷史
+        calc.addToHistory(`${expression} = ${result}`);
+        
+        // 清空表達式輸入
+        expressionInput.value = '';
+        
+        // 統計 - 全域變數修改
+        window.calculationCount = (window.calculationCount || 0) + 1;
+        console.log('Total calculations:', window.calculationCount);
+        
+    } catch (error) {
+        console.error('Expression evaluation error:', error);
+        document.getElementById('display').value = 'Error';
+        alert('表達式錯誤: ' + error.message); // 使用 alert - 不好的用戶體驗
+    }
+}
