@@ -71,6 +71,105 @@
                 <button class="btn btn-expression" onclick="evaluateComplexExpression()" style="width: 25%;">計算</button>
             </div>
             
+            <!-- 👨‍💻 程式設計師工具箱 -->
+            <div class="developer-toolkit">
+                <div class="toolkit-header">
+                    <h2>👨‍💻 程式設計師工具箱</h2>
+                    <span class="new-badge">🆕 新功能</span>
+                </div>
+                
+                <div class="toolkit-tabs">
+                    <button class="tab-btn active" onclick="switchToolkitTab('base-converter')">進制轉換</button>
+                    <button class="tab-btn" onclick="switchToolkitTab('color-converter')">顏色轉換</button>
+                    <button class="tab-btn" onclick="switchToolkitTab('encoder')">編碼工具</button>
+                    <button class="tab-btn" onclick="switchToolkitTab('timestamp')">時間戳</button>
+                </div>
+                
+                <!-- 進制轉換 -->
+                <div id="base-converter" class="toolkit-panel active">
+                    <div class="converter-row">
+                        <input type="text" id="base-input" placeholder="輸入數字" style="width: 30%;">
+                        <select id="from-base" style="width: 20%;">
+                            <option value="10">十進制</option>
+                            <option value="2">二進制</option>
+                            <option value="8">八進制</option>
+                            <option value="16">十六進制</option>
+                        </select>
+                        <span>→</span>
+                        <select id="to-base" style="width: 20%;">
+                            <option value="2">二進制</option>
+                            <option value="8">八進制</option>
+                            <option value="10" selected>十進制</option>
+                            <option value="16">十六進制</option>
+                        </select>
+                        <button class="btn btn-convert" onclick="convertBase()">轉換</button>
+                    </div>
+                    <div class="result-display" id="base-result">結果將顯示在這裡</div>
+                </div>
+                
+                <!-- 顏色轉換 -->
+                <div id="color-converter" class="toolkit-panel">
+                    <div class="converter-row">
+                        <input type="text" id="color-input" placeholder="輸入顏色值 (#FF0000 或 rgb(255,0,0))" style="width: 40%;">
+                        <select id="color-from" style="width: 20%;">
+                            <option value="hex">HEX</option>
+                            <option value="rgb">RGB</option>
+                        </select>
+                        <span>→</span>
+                        <select id="color-to" style="width: 20%;">
+                            <option value="rgb">RGB</option>
+                            <option value="hex">HEX</option>
+                        </select>
+                        <button class="btn btn-convert" onclick="convertColor()">轉換</button>
+                    </div>
+                    <div class="result-display" id="color-result">
+                        <div class="color-preview" id="color-preview" style="width: 50px; height: 50px; border: 1px solid #ccc; display: inline-block; margin-right: 10px;"></div>
+                        <span id="color-text">結果將顯示在這裡</span>
+                    </div>
+                </div>
+                
+                <!-- 編碼工具 -->
+                <div id="encoder" class="toolkit-panel">
+                    <div class="converter-row">
+                        <textarea id="encode-input" placeholder="輸入要編碼的文字" style="width: 40%; height: 60px;"></textarea>
+                        <select id="encoding-type" style="width: 20%;">
+                            <option value="base64">Base64</option>
+                            <option value="url">URL 編碼</option>
+                            <option value="hex">Hex</option>
+                            <option value="binary">二進制</option>
+                        </select>
+                        <div>
+                            <button class="btn btn-convert" onclick="encodeText()">編碼</button>
+                            <button class="btn btn-convert" onclick="decodeText()">解碼</button>
+                        </div>
+                    </div>
+                    <div class="result-display" id="encode-result">結果將顯示在這裡</div>
+                </div>
+                
+                <!-- 時間戳轉換 -->
+                <div id="timestamp" class="toolkit-panel">
+                    <div class="converter-row">
+                        <input type="text" id="timestamp-input" placeholder="輸入時間戳或日期" style="width: 40%;">
+                        <select id="timestamp-format" style="width: 25%;">
+                            <option value="iso">ISO 格式</option>
+                            <option value="local">本地時間</option>
+                            <option value="date">僅日期</option>
+                            <option value="time">僅時間</option>
+                        </select>
+                        <button class="btn btn-convert" onclick="convertTimestamp()">轉換</button>
+                        <button class="btn btn-convert" onclick="getCurrentTimestamp()">現在</button>
+                    </div>
+                    <div class="result-display" id="timestamp-result">結果將顯示在這裡</div>
+                </div>
+                
+                <!-- 快速工具 -->
+                <div class="quick-tools">
+                    <button class="btn btn-tool" onclick="generateUUID()">生成 UUID</button>
+                    <button class="btn btn-tool" onclick="calculateHash()">簡單雜湊</button>
+                    <button class="btn btn-tool" onclick="showConversionHistory()">轉換歷史</button>
+                </div>
+            </div>
+
             <!-- 貨幣轉換器 -->
             <div class="currency-converter">
                 <div class="currency-header">
@@ -125,6 +224,7 @@
     
     <script src="src/scientific-calculator.js"></script>
     <script src="src/advanced-math-utils.js"></script>
+    <script src="src/developer-toolkit.js"></script>
     <script src="src/calculator.js"></script>
     <script src="src/currency.js"></script>
     

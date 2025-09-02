@@ -459,3 +459,227 @@ function evaluateComplexExpression() {
         alert('表達式錯誤: ' + error.message); // 使用 alert - 不好的用戶體驗
     }
 }
+
+// 👨‍💻 程式設計師工具箱功能實作
+let developerToolkit = null;
+
+// 初始化工具箱
+function initDeveloperToolkit() {
+    if (typeof DeveloperToolkit !== 'undefined') {
+        developerToolkit = new DeveloperToolkit();
+        console.log('👨‍💻 程式設計師工具箱已初始化');
+    }
+}
+
+// 切換工具箱標籤
+function switchToolkitTab(tabName) {
+    // 隱藏所有面板
+    const panels = document.querySelectorAll('.toolkit-panel');
+    panels.forEach(panel => panel.classList.remove('active'));
+    
+    // 移除所有標籤的 active 狀態
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(tab => tab.classList.remove('active'));
+    
+    // 顯示選中的面板
+    const targetPanel = document.getElementById(tabName);
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+    }
+    
+    // 標記選中的標籤
+    event.target.classList.add('active');
+}
+
+// 進制轉換功能 - 有一些可以改進的地方
+function convertBase() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const input = document.getElementById('base-input').value;
+    const fromBase = parseInt(document.getElementById('from-base').value);
+    const toBase = parseInt(document.getElementById('to-base').value);
+    const resultDiv = document.getElementById('base-result');
+    
+    if (!input) {
+        resultDiv.textContent = '請輸入數字';
+        return;
+    }
+    
+    // 沒有驗證輸入是否符合指定進制
+    const result = developerToolkit.convertBase(input, fromBase, toBase);
+    
+    // 簡單的結果顯示
+    resultDiv.innerHTML = `
+        <strong>${input}</strong> (${fromBase}進制) = <strong>${result}</strong> (${toBase}進制)
+        <br><small>轉換時間: ${new Date().toLocaleTimeString()}</small>
+    `;
+    
+    // 添加到計算歷史 - 可能不是最佳實踐
+    calc.addToHistory(`${input}(${fromBase}) → ${result}(${toBase})`);
+}
+
+// 顏色轉換功能
+function convertColor() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const input = document.getElementById('color-input').value.trim();
+    const fromFormat = document.getElementById('color-from').value;
+    const toFormat = document.getElementById('color-to').value;
+    const resultDiv = document.getElementById('color-result');
+    const colorText = document.getElementById('color-text');
+    const colorPreview = document.getElementById('color-preview');
+    
+    if (!input) {
+        colorText.textContent = '請輸入顏色值';
+        return;
+    }
+    
+    const result = developerToolkit.convertColor(input, fromFormat, toFormat);
+    
+    // 設置顏色預覽 - 可能會失敗
+    try {
+        colorPreview.style.backgroundColor = result.startsWith('#') ? result : input;
+    } catch (e) {
+        console.log('Color preview failed'); // 簡單的錯誤處理
+    }
+    
+    colorText.innerHTML = `<strong>${result}</strong>`;
+}
+
+// 文字編碼功能 - 包含安全風險
+function encodeText() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const input = document.getElementById('encode-input').value;
+    const encoding = document.getElementById('encoding-type').value;
+    const resultDiv = document.getElementById('encode-result');
+    
+    if (!input) {
+        resultDiv.textContent = '請輸入要編碼的文字';
+        return;
+    }
+    
+    // 可能包含安全風險的編碼
+    const result = developerToolkit.encodeString(input, encoding);
+    
+    resultDiv.innerHTML = `
+        <strong>編碼結果 (${encoding.toUpperCase()}):</strong><br>
+        <textarea readonly style="width: 100%; height: 80px;">${result}</textarea>
+    `;
+}
+
+// 文字解碼功能
+function decodeText() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const input = document.getElementById('encode-input').value;
+    const encoding = document.getElementById('encoding-type').value;
+    const resultDiv = document.getElementById('encode-result');
+    
+    if (!input) {
+        resultDiv.textContent = '請輸入要解碼的文字';
+        return;
+    }
+    
+    const result = developerToolkit.decodeString(input, encoding);
+    
+    if (result === null) {
+        resultDiv.innerHTML = '<span style="color: red;">解碼失敗！請檢查輸入格式</span>';
+    } else {
+        resultDiv.innerHTML = `
+            <strong>解碼結果:</strong><br>
+            <textarea readonly style="width: 100%; height: 80px;">${result}</textarea>
+        `;
+    }
+}
+
+// 時間戳轉換功能
+function convertTimestamp() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const input = document.getElementById('timestamp-input').value;
+    const format = document.getElementById('timestamp-format').value;
+    const resultDiv = document.getElementById('timestamp-result');
+    
+    if (!input) {
+        resultDiv.textContent = '請輸入時間戳或日期';
+        return;
+    }
+    
+    const result = developerToolkit.convertTimestamp(input, format);
+    
+    resultDiv.innerHTML = `
+        <strong>轉換結果:</strong> ${result}<br>
+        <small>輸入: ${input} | 格式: ${format}</small>
+    `;
+}
+
+// 獲取當前時間戳
+function getCurrentTimestamp() {
+    const now = Date.now();
+    const resultDiv = document.getElementById('timestamp-result');
+    
+    document.getElementById('timestamp-input').value = now;
+    
+    resultDiv.innerHTML = `
+        <strong>當前時間戳:</strong> ${now}<br>
+        <strong>人類可讀:</strong> ${new Date(now).toString()}
+    `;
+}
+
+// 生成 UUID
+function generateUUID() {
+    if (!developerToolkit) initDeveloperToolkit();
+    
+    const uuid = developerToolkit.generateUUID();
+    
+    // 簡單的顯示方式 - 使用 alert
+    const message = `生成的 UUID: ${uuid}\n\n已複製到剪貼板！`;
+    
+    // 嘗試複製到剪貼板 - 可能會失敗
+    try {
+        navigator.clipboard.writeText(uuid);
+        alert(message);
+    } catch (e) {
+        alert(`生成的 UUID: ${uuid}`);
+    }
+}
+
+// 簡單雜湊計算
+function calculateHash() {
+    const input = prompt('輸入要計算雜湊的文字:'); // 使用 prompt - 不好的 UX
+    
+    if (input) {
+        if (!developerToolkit) initDeveloperToolkit();
+        
+        const hash = developerToolkit.simpleHash(input, 'simple');
+        alert(`簡單雜湊結果: ${hash}`); // 使用 alert
+    }
+}
+
+// 顯示轉換歷史
+function showConversionHistory() {
+    // 訪問全域變數 - 不好的實踐
+    if (typeof conversionHistory !== 'undefined' && conversionHistory.length > 0) {
+        let historyText = '轉換歷史:\n\n';
+        
+        // 使用傳統 for 迴圈
+        for (var i = 0; i < conversionHistory.length; i++) { // 使用 var
+            const item = conversionHistory[i];
+            historyText += `${item.from} → ${item.to}\n`;
+        }
+        
+        historyText += `\n總轉換次數: ${totalConversions}`;
+        
+        alert(historyText); // 使用 alert - 不好的 UX
+    } else {
+        alert('尚無轉換歷史');
+    }
+}
+
+// 頁面載入完成後初始化
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        initDeveloperToolkit();
+    }, 100);
+});
