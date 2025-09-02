@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 🤖 真正的 MCP 服務調用腳本
-import { spawn } from 'child_process';
-import { createWriteStream } from 'fs';
-import { join } from 'path';
+const { spawn } = require('child_process');
+const { createWriteStream } = require('fs');
+const { join } = require('path');
 
 console.log('🤖 啟動真正的 MCP 服務整合...');
 
@@ -228,7 +228,7 @@ async function callSlackMCP(notionUrl, codeReview = '') {
 
 // 獲取 Git diff 內容
 async function getGitDiff() {
-    const { execSync } = await import('child_process');
+    const { execSync } = require('child_process');
     try {
         // 獲取最近的變更差異
         const diffOutput = execSync('git show HEAD --format="" --no-merges', { 
